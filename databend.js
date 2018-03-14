@@ -32,7 +32,7 @@ function scaleImageData(imageData, scale) {
         'frameRate': 5,
         'grainsPerSecond': 12,
         'grainSize': 40000,
-        'walkProbability': 1,
+        'walkProbability': 0.4,
         'playAudio': true
       }
 
