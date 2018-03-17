@@ -6,6 +6,7 @@ function handleDatGUI(databender){
       .onFinishChange(function (value) { 
         databender.config[param] = value;
         databender.bend(databender.imageData)
+          .then(databender.granularize.bind(databender))
           .then(databender.render.bind(databender))
           .then(databender.draw.bind(databender))
       });

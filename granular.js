@@ -1,24 +1,29 @@
 var context = new AudioContext;
 
-var Grain = function(context, data, output) {
+var Grain = function(context, data, output, isAudio) {
   this.context = context;
   this.data = data;
   this.output = output;
 
-  this.setup();
+  this.setup(isAudio);
 };
 
-Grain.prototype.setup = function() {
+Grain.prototype.setup = function(isAudio) {
   var N = this.data.length;
   this.buffer = this.context.createBuffer(1, N, this.context.sampleRate);
 
-  var buffer_data = this.buffer.getChannelData(0);
+    var buffer_data = this.buffer.getChannelData(0);
 
-  for (var i = 0; i < N; i++) {
-    // Hann window
-    window_fn = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
-    buffer_data[i] = this.data[i] * window_fn;
-  }
+    if (isAudio) {
+      for (var i = 0; i < N; i++) {
+        // Hann window, useful for removing clipping sounds from start/stop of grains.
+        // But don't do for image/video because it simply removes visuals.
+        window_fn = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
+        buffer_data[i] = this.data[i] * window_fn;
+      }
+    } else {
+      buffer_data.set(this.data);
+    }
 };
 
 Grain.prototype.trigger = function(time, isAudio) {
@@ -35,7 +40,7 @@ Grain.prototype.trigger = function(time, isAudio) {
   }
 };
 
-var GranularSynth = function(context, buffer, databender, params) {
+var GranularSynth = function(context, buffer, databender, params, isAudio) {
   this.context = context;
   this.buffer = buffer;
   this.databender = databender;
@@ -47,15 +52,15 @@ var GranularSynth = function(context, buffer, databender, params) {
   this.grainSize = params.grainSize;
   this.walkProbability = params.walkProbability;
 
-  this.createGrains();
+  this.createGrains(isAudio);
 };
 
-GranularSynth.prototype.createGrains = function() {
+GranularSynth.prototype.createGrains = function(isAudio) {
   var rawData = this.buffer.getChannelData(0);
   var chunks = _.chunk(rawData, this.grainSize);
 
   this.grains = chunks.map(function(data) {
-    return new Grain(this.context, data, this.output)
+    return new Grain(this.context, data, this.output, isAudio)
   }.bind(this));
 };
 
@@ -66,6 +71,7 @@ GranularSynth.prototype.stop = function() {
 GranularSynth.prototype.play = function(isAudio) {
   var scheduleAheadTime = 1;
   var nextGrainTime = this.context.currentTime;
+  // I Think this is something that we want to change dynamically, maybe by pressing a key or clicking a sample
   var grainIndex = 25;
 
   this.scheduler = setInterval(function() {

@@ -1,38 +1,12 @@
-function scaleImageData(imageData, scale) {
-  var tmpCanvas = document.createElement('canvas');
-  var scaled = tmpCanvas.getContext('2d').createImageData(imageData.width * scale, imageData.height * scale);
-
-  for(var row = 0; row < imageData.height; row++) {
-    for(var col = 0; col < imageData.width; col++) {
-      var sourcePixel = [
-        imageData.data[(row * imageData.width + col) * 4 + 0],
-        imageData.data[(row * imageData.width + col) * 4 + 1],
-        imageData.data[(row * imageData.width + col) * 4 + 2],
-        imageData.data[(row * imageData.width + col) * 4 + 3]
-      ];
-      for(var y = 0; y < scale; y++) {
-        var destRow = row * scale + y;
-        for(var x = 0; x < scale; x++) {
-          var destCol = col * scale + x;
-          for(var i = 0; i < 4; i++) {
-            scaled.data[(destRow * scaled.width + destCol) * 4 + i] =
-              sourcePixel[i];
-          }
-        }
-      }
-    }
-  }
-
-  return scaled;
-}
     // Create a Databender instance
     var Databender = function (audioCtx, renderCanvas) {
 
       var defaultConfig = {
         'frameRate': 5,
-        'grainsPerSecond': 12,
+        'numberOfGrains': 4,
+        'grainsPerSecond': 4, 
         'grainSize': 40000,
-        'walkProbability': 0.4,
+        'walkProbability': 1,
         'playAudio': true
       }
 
@@ -45,10 +19,15 @@ function scaleImageData(imageData, scale) {
       this.channels = 1; // @TODO - What would multiple channels look like?
 
       this.bend = function (image) {
+        if (!image) {
+          return;
+        }
+
         if (image instanceof Image || image instanceof HTMLVideoElement) {
           var canvas = document.createElement('canvas');
-          canvas.width = 1280;
-          canvas.height = 768;
+          // these are potentially interesting controls for creating a glitch-like effect (stretched pixels)
+          canvas.width = image.width; 
+          canvas.height = image.height;
           var context = canvas.getContext('2d');
           context.drawImage(image, 0, 0, canvas.width, canvas.height);
           var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -71,8 +50,8 @@ function scaleImageData(imageData, scale) {
       }
 
       this.granularize = function (buffer, isAudio) {
-
-        var granularSynth = new GranularSynth(this.audioCtx, buffer, databender, this.config);
+        this.config.grainSize = buffer.length / this.config.numberOfGrains
+        var granularSynth = new GranularSynth(this.audioCtx, buffer, databender, this.config, isAudio);
         return granularSynth.play(isAudio);
       };
 
@@ -117,10 +96,29 @@ function scaleImageData(imageData, scale) {
 
         // putImageData requires an ImageData Object
         // @see https://developer.mozilla.org/en-US/docs/Web/API/ImageData
-        var transformedImage = new ImageData(clampedDataArray, 100, 100);
-        var scaledTransformedImage = scaleImageData(transformedImage, 4);
-  
-        this.renderCanvas.getContext('2d').putImageData(scaledTransformedImage, 0, 0);
+        // 4 * imageWidth * imageHeight = bufferSize
+
+        // Okay so basically I am doing something awesome and creating a slightly larger ImageData object to handle whatever
+        // segment of data we want. I have no idea what is going on with this and it's making some weird looking shit but it's kind
+        // of cool so whatever!
+        var widthToApply = Math.ceil(this.imageData.width / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains))); 
+        var heightToApply = Math.ceil(this.imageData.height / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains)));
+        console.log(widthToApply, 'original width to apply');
+        console.log(heightToApply, 'height that will be applied');
+        console.log(clampedDataArray.length, 'size of the buffer');
+        var transformedImage;
+        if (widthToApply * heightToApply * 4 !== clampedDataArray) {
+        }
+        
+        var transformedImage = new ImageData(widthToApply, heightToApply);
+
+        transformedImage.data.set(clampedDataArray);
+
+        var tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = this.imageData.width / Math.sqrt(this.config.numberOfGrains);
+        tmpCanvas.height = this.imageData.height / Math.sqrt(this.config.numberOfGrains);
+        tmpCanvas.getContext('2d').putImageData(transformedImage, 0, 0);
+        this.renderCanvas.getContext('2d').drawImage(tmpCanvas, 0, 0, 1280, 768);
       };
 
 
