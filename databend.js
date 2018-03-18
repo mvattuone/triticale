@@ -2,7 +2,8 @@
     var Databender = function (audioCtx, renderCanvas) {
 
       var defaultConfig = {
-        'frameRate': 5,
+        'grainIndex': 3,
+        'frameRate': 1,
         'numberOfGrains': 4,
         'grainsPerSecond': 4, 
         'grainSize': 40000,
@@ -57,29 +58,23 @@
 
       this.render = function (buffer, time) {
         var _this = this;
-        return new Promise(function (resolve, reject) {
 
-          // Create offlineAudioCtx that will house our rendered buffer
-          var offlineAudioCtx = new OfflineAudioContext(_this.channels, buffer.length, _this.audioCtx.sampleRate);
+        // Create offlineAudioCtx that will house our rendered buffer
+        var offlineAudioCtx = new OfflineAudioContext(_this.channels, buffer.length, _this.audioCtx.sampleRate);
 
-          // Create an AudioBufferSourceNode, which represents an audio source consisting of in-memory audio data
-          var bufferSource = offlineAudioCtx.createBufferSource();
+        // Create an AudioBufferSourceNode, which represents an audio source consisting of in-memory audio data
+        var bufferSource = offlineAudioCtx.createBufferSource();
 
-          // Set buffer to audio buffer containing image data
-          bufferSource.buffer = buffer; 
+        // Set buffer to audio buffer containing image data
+        bufferSource.buffer = buffer; 
 
-          //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
-          bufferSource.start();
+        //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
+        bufferSource.start();
 
-          bufferSource.connect(offlineAudioCtx.destination);
+        bufferSource.connect(offlineAudioCtx.destination);
 
-          // Kick off the render, callback will contain rendered buffer in event
-          offlineAudioCtx.startRendering();
-          // Render the databent image.
-          offlineAudioCtx.oncomplete = function (e) {
-            resolve(e.renderedBuffer);
-          };
-        });
+        // Kick off the render, callback will contain rendered buffer in event
+        return offlineAudioCtx.startRendering();
       };
 
       this.draw = function (buffer) {

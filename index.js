@@ -7,8 +7,6 @@ function handleDatGUI(databender){
         databender.config[param] = value;
         databender.bend(databender.imageData)
           .then(databender.granularize.bind(databender))
-          .then(databender.render.bind(databender))
-          .then(databender.draw.bind(databender))
       });
   });
 };
@@ -94,7 +92,7 @@ function handleFileUpload(file) {
 };
 
 function loadTrack () {
-  var url = 'sample.mp3';
+  var url = 'sample3.mp3';
   var request = new XMLHttpRequest();
   request.open('GET', url, true);
   request.responseType = 'arraybuffer';
@@ -102,10 +100,7 @@ function loadTrack () {
   request.onload = function() {
     var bufferSource = audioCtx.createBufferSource();
     bufferSource.loop = true;
-    audioCtx.decodeAudioData(request.response, function (buffer) {
-      window.trackBuffer = buffer;
-      databender.granularize(window.trackBuffer, true);
-    });
+    window.trackBuffer = request.response;
   };
   request.send();
 };
@@ -123,9 +118,12 @@ function main () {
     document.querySelector('.upload').style.display = 'none';
     var files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
     handleFileUpload(files[0]);
+    audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
+      databender.granularize(buffer, true);
+    });
+    databender = new Databender(audioCtx, renderCanvas);
+    handleDatGUI(databender);
   }
-  databender = new Databender(audioCtx, renderCanvas);
-  handleDatGUI(databender);
 };
 
 main();

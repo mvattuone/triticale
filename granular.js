@@ -52,6 +52,7 @@ var GranularSynth = function(context, buffer, databender, params, isAudio) {
   this.grainSize = params.grainSize;
   this.walkProbability = params.walkProbability;
 
+  console.log('heloooo');
   this.createGrains(isAudio);
 };
 
@@ -72,10 +73,22 @@ GranularSynth.prototype.play = function(isAudio) {
   var scheduleAheadTime = 1;
   var nextGrainTime = this.context.currentTime;
   // I Think this is something that we want to change dynamically, maybe by pressing a key or clicking a sample
-  var grainIndex = 25;
+  var grainIndex = databender.config.grainIndex;
+  var interval = 1000 / databender.config.frameRate;
+  var now;
+  var then = Date.now();
+  var delta;
 
-  this.scheduler = setInterval(function() {
-    while (nextGrainTime < this.context.currentTime + scheduleAheadTime ) {
+  console.log(interval);
+
+  var triggerGrain = function() {
+    requestAnimationFrame(triggerGrain.bind(this));
+    
+    console.log('what is grain index', grainIndex);
+    now = Date.now();
+    delta = now - then;
+
+    if (delta > interval) {
       if (Math.random() < this.walkProbability) {
         if (Math.random() > 0.5) {
           grainIndex = Math.min(this.grains.length - 1, grainIndex + 1);
@@ -86,7 +99,10 @@ GranularSynth.prototype.play = function(isAudio) {
 
       nextGrainTime += 1 / this.grainsPerSecond;
       this.grains[grainIndex].trigger(nextGrainTime, isAudio);
+      then = now - (delta % interval);
     }
-  }.bind(this), 250);
+  }
+
+  this.scheduler = requestAnimationFrame(triggerGrain.bind(this));
 };
 
