@@ -49,11 +49,6 @@
         return Promise.resolve(audioBuffer); 
       }
 
-      this.granularize = function (buffer, isAudio) {
-        var granularSynth = new GranularSynth(this.audioCtx, buffer, databender, isAudio);
-        return granularSynth.play(isAudio);
-      };
-
       this.render = function (buffer, time) {
         var _this = this;
 

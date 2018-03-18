@@ -4,9 +4,10 @@ function handleDatGUI(databender){
   Object.keys(databender.config).forEach(function (param) {
     gui.add(databender.config, param)            
       .onFinishChange(function (value) { 
+        console.log(value);
+        console.log(param);
         databender.config[param] = value;
-        databender.bend(databender.imageData)
-          .then(databender.granularize.bind(databender))
+        granularSynth.updateValues(databender.config);
       });
   });
 };
@@ -35,7 +36,10 @@ function handleImageUpload (e, renderCanvas) {
     var img = new Image();
     img.onload = function () {
       databender.bend(img)
-        .then(databender.granularize.bind(databender))
+        .then((buffer) => {
+          granularSynth.videoBuffer = buffer;
+          granularSynth.createGrains();
+        })
     };
     img.src = e.target.result;
   }
@@ -111,14 +115,24 @@ function main () {
   upload.ondragend = function () { this.classList.remove('hover'); return false; };
   upload.ondrop = function (e) {
     e.preventDefault();
+    databender = new Databender(audioCtx, renderCanvas);
+    granularSynth = new GranularSynth(audioCtx, databender); 
+    handleDatGUI(databender);
     document.querySelector('.upload').style.display = 'none';
     var files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
     handleFileUpload(files[0]);
     audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
-      databender.granularize(buffer, true);
+      granularSynth.audioBuffer = buffer;
+      granularSynth.createGrains(true);
+      document.addEventListener('keypress', (e) => {
+        if (e.code === 'Enter') {
+          granularSynth.play();
+        }
+        if (e.code === 'Backslash') {
+          granularSynth.stop();
+        }
+      });
     });
-    databender = new Databender(audioCtx, renderCanvas);
-    handleDatGUI(databender);
   }
 };
 

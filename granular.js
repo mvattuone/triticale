@@ -32,7 +32,7 @@ Grain.prototype.trigger = function(time, isAudio) {
     bufferSource.buffer = this.buffer;
     bufferSource.connect(audioCtx.destination);
     if (databender.config.playAudio) {
-      bufferSource.start(0);
+      bufferSource.start(time);
     }
   } else {
     databender.render(this.buffer, time)
@@ -40,9 +40,8 @@ Grain.prototype.trigger = function(time, isAudio) {
   }
 };
 
-var GranularSynth = function(context, buffer, databender, isAudio) {
+var GranularSynth = function(context, databender) {
   this.context = context;
-  this.buffer = buffer;
   this.databender = databender;
   this.config = databender.config
 
@@ -50,36 +49,52 @@ var GranularSynth = function(context, buffer, databender, isAudio) {
   this.output.connect(context.destination);
 
   this.grainsPerSecond = this.config.grainsPerSecond;
-  this.grainSize = Math.floor(this.buffer.length / this.config.numberOfGrains);
   this.walkProbability = this.config.walkProbability;
-
-  this.createGrains(isAudio);
 };
 
 GranularSynth.prototype.createGrains = function(isAudio) {
-  var rawData = this.buffer.getChannelData(0);
-  var chunks = _.chunk(rawData, this.grainSize);
-
-  this.grains = chunks.map(function(data) {
+  var buffer = isAudio ? this.audioBuffer : this.videoBuffer;
+  var rawData = buffer.getChannelData(0);
+  var grainSize = Math.floor(buffer.length / this.config.numberOfGrains);
+  var chunks = _.chunk(rawData, grainSize);
+  var grains = chunks.map(function(data) {
     return new Grain(this.context, data, this.output, isAudio)
   }.bind(this));
+
+  if (isAudio) { 
+    this.audioGrains = grains;
+  } else {
+    this.videoGrains = grains;
+  }
 };
 
-GranularSynth.prototype.play = function(isAudio) {
-  var scheduleAheadTime = 1;
+GranularSynth.prototype.updateValues = function (config) { 
+  this.config = config;
+  this.createGrains(true);
+  this.createGrains();
+  return;
+};
+
+GranularSynth.prototype.stop = function () { 
+  cancelAnimationFrame(this.scheduler);
+  this.stopLoop = true;
+  return;
+};
+
+GranularSynth.prototype.play = function() {
+  this.stopLoop = false;
   var nextGrainTime = this.context.currentTime;
-  // I Think this is something that we want to change dynamically, maybe by pressing a key or clicking a sample
-  var grainIndex = this.config.grainIndex;
-  var interval = 1000 / this.config.frameRate;
   var now;
   var then = Date.now();
   var delta;
 
-  console.log(interval);
-
   var triggerGrain = function() {
-    requestAnimationFrame(triggerGrain.bind(this));
-    
+    if (!this.stopLoop) {
+      requestAnimationFrame(triggerGrain.bind(this));
+    }
+
+    var interval = 1000 / this.config.frameRate;
+    var grainIndex = this.databender.config.grainIndex;
     console.log('what is grain index', grainIndex);
     now = Date.now();
     delta = now - then;
@@ -87,18 +102,22 @@ GranularSynth.prototype.play = function(isAudio) {
     if (delta > interval) {
       if (Math.random() < this.walkProbability) {
         if (Math.random() > 0.5) {
-          grainIndex = Math.min(this.grains.length - 1, grainIndex + 1);
+          grainIndex = Math.min(this.audioGrains.length - 1, grainIndex + 1);
         } else {
           grainIndex = Math.max(0, grainIndex - 1);
         }
       }
 
       nextGrainTime += 1 / this.grainsPerSecond;
-      this.grains[grainIndex].trigger(nextGrainTime, isAudio);
+      this.audioGrains[grainIndex].trigger(nextGrainTime, true);
+      this.videoGrains[grainIndex].trigger(nextGrainTime);
+
       then = now - (delta % interval);
     }
   }
 
-  this.scheduler = requestAnimationFrame(triggerGrain.bind(this));
+  this.scheduler = requestAnimationFrame(() => {
+    triggerGrain.call(this)
+  });
 };
 
