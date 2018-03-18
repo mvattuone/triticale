@@ -40,19 +40,19 @@ Grain.prototype.trigger = function(time, isAudio) {
   }
 };
 
-var GranularSynth = function(context, buffer, databender, params, isAudio) {
+var GranularSynth = function(context, buffer, databender, isAudio) {
   this.context = context;
   this.buffer = buffer;
   this.databender = databender;
+  this.config = databender.config
 
-  this.output = context.createDynamicsCompressor();
+  this.output = context.createGain();
   this.output.connect(context.destination);
 
-  this.grainsPerSecond = params.grainsPerSecond;
-  this.grainSize = params.grainSize;
-  this.walkProbability = params.walkProbability;
+  this.grainsPerSecond = this.config.grainsPerSecond;
+  this.grainSize = Math.floor(this.buffer.length / this.config.numberOfGrains);
+  this.walkProbability = this.config.walkProbability;
 
-  console.log('heloooo');
   this.createGrains(isAudio);
 };
 
@@ -65,16 +65,12 @@ GranularSynth.prototype.createGrains = function(isAudio) {
   }.bind(this));
 };
 
-GranularSynth.prototype.stop = function() {
-  clearInterval(this.scheduler);
-};
-
 GranularSynth.prototype.play = function(isAudio) {
   var scheduleAheadTime = 1;
   var nextGrainTime = this.context.currentTime;
   // I Think this is something that we want to change dynamically, maybe by pressing a key or clicking a sample
-  var grainIndex = databender.config.grainIndex;
-  var interval = 1000 / databender.config.frameRate;
+  var grainIndex = this.config.grainIndex;
+  var interval = 1000 / this.config.frameRate;
   var now;
   var then = Date.now();
   var delta;

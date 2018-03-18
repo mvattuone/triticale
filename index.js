@@ -92,17 +92,13 @@ function handleFileUpload(file) {
 };
 
 function loadTrack () {
-  var url = 'sample3.mp3';
-  var request = new XMLHttpRequest();
-  request.open('GET', url, true);
-  request.responseType = 'arraybuffer';
-  // Decode asynchronously
-  request.onload = function() {
-    var bufferSource = audioCtx.createBufferSource();
-    bufferSource.loop = true;
-    window.trackBuffer = request.response;
-  };
-  request.send();
+  fetch('sample3.mp3')
+    .then((response) => response.arrayBuffer())
+    .then((buffer) => {
+      window.trackBuffer = buffer;
+    }).catch((err) => {
+      console.error(`Error while loading: ${err}`);
+    });
 };
 
 function main () {

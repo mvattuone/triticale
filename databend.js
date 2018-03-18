@@ -6,7 +6,6 @@
         'frameRate': 1,
         'numberOfGrains': 4,
         'grainsPerSecond': 4, 
-        'grainSize': 40000,
         'walkProbability': 1,
         'playAudio': true
       }
@@ -51,8 +50,7 @@
       }
 
       this.granularize = function (buffer, isAudio) {
-        this.config.grainSize = buffer.length / this.config.numberOfGrains
-        var granularSynth = new GranularSynth(this.audioCtx, buffer, databender, this.config, isAudio);
+        var granularSynth = new GranularSynth(this.audioCtx, buffer, databender, isAudio);
         return granularSynth.play(isAudio);
       };
 
