@@ -1,5 +1,5 @@
 ## What is this 
-This is an attempt at making a granular synthesiser that affects both an audio sample as well as an image sampled as audio. Granular synthesis is 
+This is an attempt at making a granular synthesiser that affects both an audio sample as well as an image sampled as audio. Granular synthesis is a process in which a sound is broken up into many "microsounds", or "grains", and the reorganized to make new sounds. 
 
 The granular synth is a modified version of the demo synth used here - https://github.com/chrislo/synth_history/. Much thanks to Chris Lowis for making that available to learn from. 
 
