@@ -2,7 +2,7 @@
 function handleDatGUI(databender){
   var gui = new dat.GUI();
   Object.keys(databender.config).forEach(function (param) {
-    gui.add(databender.config, param, 0, 100, .01)            
+    gui.add(databender.config, param, 0, 2000, .01)            
       .onFinishChange(function (value) { 
         databender.config[param] = value;
         granularSynth.updateValues(databender.config);
