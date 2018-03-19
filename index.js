@@ -2,10 +2,8 @@
 function handleDatGUI(databender){
   var gui = new dat.GUI();
   Object.keys(databender.config).forEach(function (param) {
-    gui.add(databender.config, param)            
+    gui.add(databender.config, param, 0, 100, .01)            
       .onFinishChange(function (value) { 
-        console.log(value);
-        console.log(param);
         databender.config[param] = value;
         granularSynth.updateValues(databender.config);
       });
@@ -96,7 +94,7 @@ function handleFileUpload(file) {
 };
 
 function loadTrack () {
-  fetch('sample3.mp3')
+  fetch('sample5.m4a')
     .then((response) => response.arrayBuffer())
     .then((buffer) => {
       window.trackBuffer = buffer;

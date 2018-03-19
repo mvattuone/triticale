@@ -2,10 +2,15 @@
     var Databender = function (audioCtx, renderCanvas) {
 
       var defaultConfig = {
+        'loopAudio': false,
+        'loopVideo': false,
+        'attack': 0.4,
+        'enableEnvelopes': false,
+        'release': 1.5,
         'grainIndex': 3,
+        'offset': 0,
         'frameRate': 1,
         'numberOfGrains': 4,
-        'grainsPerSecond': 4, 
         'walkProbability': 1,
         'playAudio': true
       }
@@ -49,22 +54,31 @@
         return Promise.resolve(audioBuffer); 
       }
 
-      this.render = function (buffer, time) {
-        var _this = this;
-
+      this.render = function (buffer) {
         // Create offlineAudioCtx that will house our rendered buffer
-        var offlineAudioCtx = new OfflineAudioContext(_this.channels, buffer.length, _this.audioCtx.sampleRate);
+        var offlineAudioCtx = new OfflineAudioContext(this.channels, buffer.length, this.audioCtx.sampleRate);
 
         // Create an AudioBufferSourceNode, which represents an audio source consisting of in-memory audio data
         var bufferSource = offlineAudioCtx.createBufferSource();
+        var gainNode = offlineAudioCtx.createGain();
 
         // Set buffer to audio buffer containing image data
         bufferSource.buffer = buffer; 
 
-        //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
-        bufferSource.start();
-
         bufferSource.connect(offlineAudioCtx.destination);
+      
+        var duration = this.config.enableEnvelopes ? this.config.attack + this.config.release : bufferSource.buffer.duration;
+
+        //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
+        bufferSource.start(0, this.config.offset, duration);
+        bufferSource.loop = this.config.loopVideo;
+        if (this.config.enableEnvelopes) {
+          gainNode.gain.setValueAtTime(0.0, 0);
+          gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.config.attack);
+          gainNode.gain.linearRampToValueAtTime(0, 0 + (this.config.attack + this.config.release));
+        }
+        bufferSource.connect(gainNode);
+
 
         // Kick off the render, callback will contain rendered buffer in event
         return offlineAudioCtx.startRendering();
@@ -91,12 +105,7 @@
         // of cool so whatever!
         var widthToApply = Math.ceil(this.imageData.width / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains))); 
         var heightToApply = Math.ceil(this.imageData.height / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains)));
-        console.log(widthToApply, 'original width to apply');
-        console.log(heightToApply, 'height that will be applied');
-        console.log(clampedDataArray.length, 'size of the buffer');
         var transformedImage;
-        if (widthToApply * heightToApply * 4 !== clampedDataArray) {
-        }
         
         var transformedImage = new ImageData(widthToApply, heightToApply);
 
