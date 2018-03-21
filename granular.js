@@ -102,8 +102,9 @@ GranularSynth.prototype.play = function() {
       requestAnimationFrame(triggerGrain.bind(this));
     }
 
-    var interval = 1000 / this.config.frameRate;
     var grainIndex = this.databender.config.grainIndex;
+    console.log(this.audioGrains[grainIndex].buffer.duration);
+    var interval = (this.audioGrains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
     now = Date.now();
     delta = now - then;
 
@@ -113,7 +114,7 @@ GranularSynth.prototype.play = function() {
         if (toggle > 0.6) {
           grainIndex = Math.min(this.audioGrains.length - 1, grainIndex + 1);
         } else if (toggle < 0.4) {
-          grainIndex = Math.floor(Math.random() * this.audioGrains.length);
+          grainIndex = Math.max(Math.floor(Math.random() * this.audioGrains.length) - 1, 0);
         } else {
           grainIndex = Math.max(0, grainIndex - 1);
         }
