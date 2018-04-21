@@ -1,0 +1,23 @@
+body {
+  margin: 0;
+}
+
+.upload {
+  border: 1px solid #000;
+  margin: 0 auto;
+  width:500px;
+  height:500px;
+}
+
+.upload {
+  text-align: center;
+}
+
+.upload.hover {
+  background-color: cyan;
+}
+
+label {
+  display: block;
+  text-align: center;
+}

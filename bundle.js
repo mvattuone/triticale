@@ -614,13 +614,13 @@
     }
 
     setup(isAudio) {
-      var N = this.data.length;
+      const N = this.data.length;
       this.buffer = this.context.createBuffer(1, N, this.context.sampleRate);
 
-      var buffer_data = this.buffer.getChannelData(0);
+      const buffer_data = this.buffer.getChannelData(0);
 
       if (isAudio) {
-        for (var i = 0; i < N; i++) {
+        for (let i = 0; i < N; i++) {
           // Hann window, useful for removing clipping sounds from start/stop of grains.
           // But don't do for image/video since it removes visuals we want
           const window_fn = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
@@ -636,11 +636,11 @@
 
     trigger(isAudio) {
       if (isAudio) {
-        var bufferSource = this.context.createBufferSource();
+        const bufferSource = this.context.createBufferSource();
         bufferSource.buffer = this.buffer;
         bufferSource.connect(this.context.destination);
         if (this.databender.config.playAudio) {
-          var duration = this.databender.config.enableEnvelops ? this.databender.config.attack + this.databender.config.release : bufferSource.buffer.duration;
+          const duration = this.databender.config.enableEnvelops ? this.databender.config.attack + this.databender.config.release : bufferSource.buffer.duration;
           bufferSource.start(0,this.databender.config.offset,duration);
           bufferSource.loop = this.databender.config.loopAudio;
           if (this.databender.config.enableEnvelopes) {
@@ -697,24 +697,24 @@
 
     play() {
       this.stopLoop = false;
-      var nextGrainTime = this.context.currentTime;
-      var now;
-      var then = Date.now();
-      var delta;
+      const nextGrainTime = this.context.currentTime;
+      let now;
+      let then = Date.now();
+      let delta;
 
-      var triggerGrain = function() {
+      const triggerGrain = function() {
         if (!this.stopLoop) {
           requestAnimationFrame(triggerGrain.bind(this));
         }
 
-        var grainIndex = this.databender.config.grainIndex;
-        var interval = (this.audioGrains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
+        let grainIndex = this.databender.config.grainIndex;
+        const interval = (this.audioGrains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
         now = Date.now();
         delta = now - then;
 
         if (delta > interval) {
           if (Math.random() < this.walkProbability) {
-            var toggle = Math.random();
+            const toggle = Math.random();
             if (toggle > 0.6) {
               grainIndex = Math.min(this.audioGrains.length - 1, grainIndex + 1);
             } else if (toggle < 0.4) {
@@ -3254,13 +3254,14 @@
     const gui = new index.GUI();
     Object.keys(databender.config).forEach(function (param) {
       gui.add(databender.config, param, 0, 2000, .01)            
+        .listen()
         .onFinishChange(function (value) { 
           databender.config[param] = value;
           granularSynth.updateValues(databender.config);
         });
     });
   }
-  function renderVideoToCanvas(v, databender, renderCanvas, granularSynth) {
+  function renderVideoToCanvas(v, renderCanvas, databender, granularSynth) {
     let timer;
     let time;
 
@@ -3300,7 +3301,7 @@
     const video = document.createElement('video');
 
     video.addEventListener('play', () =>
-      renderVideoToCanvas(this, renderCanvas, databender, granularSynth)
+      renderVideoToCanvas(video, renderCanvas, databender, granularSynth)
     , false);
 
     reader.onload = function (event) {
@@ -3343,7 +3344,7 @@
     }
   }
   function loadTrack () {
-    fetch('sample5.m4a')
+    fetch('sample3.mp3')
       .then((response) => response.arrayBuffer())
       .then((buffer) => {
         window.trackBuffer = buffer;
@@ -3376,6 +3377,36 @@
           }
           if (e.code === 'Backslash') {
             granularSynth.stop();
+          }
+          if (e.code === 'KeyP') {
+            databender.config.grainIndex = 32;          
+          }
+          if (e.code === 'KeyO') {
+            databender.config.grainIndex = 27;          
+          }
+          if (e.code === 'KeyI') {
+            databender.config.grainIndex = 21;          
+          }
+          if (e.code === 'KeyU') {
+            databender.config.grainIndex = 18;          
+          }
+          if (e.code === 'KeyY') {
+            databender.config.grainIndex = 5;          
+          }
+          if (e.code === 'KeyT') {
+            databender.config.grainIndex = 11;          
+          }
+          if (e.code === 'KeyR') {
+            databender.config.grainIndex = 9;          
+          }
+          if (e.code === 'KeyE') {
+            databender.config.grainIndex = 25;          
+          }
+          if (e.code === 'KeyW') {
+            databender.config.grainIndex = 29;          
+          }
+          if (e.code === 'KeyQ') {
+            databender.config.grainIndex = 1;          
           }
         });
       });

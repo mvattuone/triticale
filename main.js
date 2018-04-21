@@ -6,6 +6,7 @@ function handleDatGUI(databender, granularSynth){
   const gui = new dat.GUI();
   Object.keys(databender.config).forEach(function (param) {
     gui.add(databender.config, param, 0, 2000, .01)            
+      .listen()
       .onFinishChange(function (value) { 
         databender.config[param] = value;
         granularSynth.updateValues(databender.config);
@@ -13,7 +14,7 @@ function handleDatGUI(databender, granularSynth){
   });
 };
 
-function renderVideoToCanvas(v, databender, renderCanvas, granularSynth) {
+function renderVideoToCanvas(v, renderCanvas, databender, granularSynth) {
   let timer;
   let time;
 
@@ -54,7 +55,7 @@ function handleVideoUpload(file, renderCanvas, databender, granularSynth){
   const video = document.createElement('video');
 
   video.addEventListener('play', () =>
-    renderVideoToCanvas(this, renderCanvas, databender, granularSynth)
+    renderVideoToCanvas(video, renderCanvas, databender, granularSynth)
   , false);
 
   reader.onload = function (event) {
@@ -99,7 +100,7 @@ function handleFileUpload(file, renderCanvas, databender, granularSynth) {
 };
 
 function loadTrack () {
-  fetch('sample5.m4a')
+  fetch('sample3.mp3')
     .then((response) => response.arrayBuffer())
     .then((buffer) => {
       window.trackBuffer = buffer;
@@ -133,6 +134,36 @@ function main () {
         }
         if (e.code === 'Backslash') {
           granularSynth.stop();
+        }
+        if (e.code === 'KeyP') {
+          databender.config.grainIndex = 32;          
+        }
+        if (e.code === 'KeyO') {
+          databender.config.grainIndex = 27;          
+        }
+        if (e.code === 'KeyI') {
+          databender.config.grainIndex = 21;          
+        }
+        if (e.code === 'KeyU') {
+          databender.config.grainIndex = 18;          
+        }
+        if (e.code === 'KeyY') {
+          databender.config.grainIndex = 5;          
+        }
+        if (e.code === 'KeyT') {
+          databender.config.grainIndex = 11;          
+        }
+        if (e.code === 'KeyR') {
+          databender.config.grainIndex = 9;          
+        }
+        if (e.code === 'KeyE') {
+          databender.config.grainIndex = 25;          
+        }
+        if (e.code === 'KeyW') {
+          databender.config.grainIndex = 29;          
+        }
+        if (e.code === 'KeyQ') {
+          databender.config.grainIndex = 1;          
         }
       });
     });

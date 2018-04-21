@@ -12,13 +12,13 @@ class Grain {
   }
 
   setup(isAudio) {
-    var N = this.data.length;
+    const N = this.data.length;
     this.buffer = this.context.createBuffer(1, N, this.context.sampleRate);
 
-    var buffer_data = this.buffer.getChannelData(0);
+    const buffer_data = this.buffer.getChannelData(0);
 
     if (isAudio) {
-      for (var i = 0; i < N; i++) {
+      for (let i = 0; i < N; i++) {
         // Hann window, useful for removing clipping sounds from start/stop of grains.
         // But don't do for image/video since it removes visuals we want
         const window_fn = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
@@ -34,11 +34,11 @@ class Grain {
 
   trigger(isAudio) {
     if (isAudio) {
-      var bufferSource = this.context.createBufferSource();
+      const bufferSource = this.context.createBufferSource();
       bufferSource.buffer = this.buffer;
       bufferSource.connect(this.context.destination);
       if (this.databender.config.playAudio) {
-        var duration = this.databender.config.enableEnvelops ? this.databender.config.attack + this.databender.config.release : bufferSource.buffer.duration
+        const duration = this.databender.config.enableEnvelops ? this.databender.config.attack + this.databender.config.release : bufferSource.buffer.duration
         bufferSource.start(0,this.databender.config.offset,duration);
         bufferSource.loop = this.databender.config.loopAudio;
         if (this.databender.config.enableEnvelopes) {
@@ -96,24 +96,24 @@ class GranularSynth {
 
   play() {
     this.stopLoop = false;
-    var nextGrainTime = this.context.currentTime;
-    var now;
-    var then = Date.now();
-    var delta;
+    const nextGrainTime = this.context.currentTime;
+    let now;
+    let then = Date.now();
+    let delta;
 
-    var triggerGrain = function() {
+    const triggerGrain = function() {
       if (!this.stopLoop) {
         requestAnimationFrame(triggerGrain.bind(this));
       }
 
-      var grainIndex = this.databender.config.grainIndex;
-      var interval = (this.audioGrains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
+      let grainIndex = this.databender.config.grainIndex;
+      const interval = (this.audioGrains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
       now = Date.now();
       delta = now - then;
 
       if (delta > interval) {
         if (Math.random() < this.walkProbability) {
-          var toggle = Math.random();
+          const toggle = Math.random();
           if (toggle > 0.6) {
             grainIndex = Math.min(this.audioGrains.length - 1, grainIndex + 1);
           } else if (toggle < 0.4) {
