@@ -1,6 +1,9 @@
+import Databender from './databend';
+import GranularSynth from './granular';
+import dat from 'dat.gui';
 
-function handleDatGUI(databender){
-  var gui = new dat.GUI();
+function handleDatGUI(databender, granularSynth){
+  const gui = new dat.GUI();
   Object.keys(databender.config).forEach(function (param) {
     gui.add(databender.config, param, 0, 2000, .01)            
       .onFinishChange(function (value) { 
@@ -10,15 +13,17 @@ function handleDatGUI(databender){
   });
 };
 
-function renderVideoToCanvas(v, renderCanvas) {
-  var timer;
-  var time;
+function renderVideoToCanvas(v, databender, renderCanvas, granularSynth) {
+  let timer;
+  let time;
 
-  function drawFrame(v, renderCanvas) {
+  function drawFrame() {
     if(v.paused || v.ended) return false;
-    var databent = databender.bend(v)
-      .then(databender.granularize.bind(databender))
-      .then(databender.draw.bind(databender))
+    databender.bend(v)
+      .then((buffer) => {
+        granularSynth.videoBuffer = buffer;
+        granularSynth.createGrains();
+      })
   }
 
   (function repeat() {
@@ -28,10 +33,10 @@ function renderVideoToCanvas(v, renderCanvas) {
   }());
 }
 
-function handleImageUpload (e, renderCanvas) {
-  var reader = new FileReader();
+function handleImageUpload (file, renderCanvas, databender, granularSynth) {
+  const reader = new FileReader();
   reader.onload = function (e) {
-    var img = new Image();
+    const img = new Image();
     img.onload = function () {
       databender.bend(img)
         .then((buffer) => {
@@ -41,16 +46,16 @@ function handleImageUpload (e, renderCanvas) {
     };
     img.src = e.target.result;
   }
-  reader.readAsDataURL(e);
+  reader.readAsDataURL(file);
 }; 
 
-function handleVideoUpload(e, renderCanvas){
-  var reader = new FileReader();
-  var video = document.createElement('video');
+function handleVideoUpload(file, renderCanvas, databender, granularSynth){
+  const reader = new FileReader();
+  const video = document.createElement('video');
 
-  video.addEventListener('play', function () {
-    renderVideoToCanvas(this);
-  }, false);
+  video.addEventListener('play', () =>
+    renderVideoToCanvas(this, renderCanvas, databender, granularSynth)
+  , false);
 
   reader.onload = function (event) {
     video.src = this.result;
@@ -59,14 +64,14 @@ function handleVideoUpload(e, renderCanvas){
     video.loop = true;
     video.play();
   }
-  reader.readAsDataURL(e);
+  reader.readAsDataURL(file);
 }
 
 function getFileType(file) {
-  var imageFileTypes = ['jpg', 'png', 'bmp', 'jpeg'];
-  var videoFileTypes = ['mp4', 'webm'];
-  var fileExtension = file.name.split('.')[1];
-  var fileType;
+  const imageFileTypes = ['jpg', 'png', 'bmp', 'jpeg'];
+  const videoFileTypes = ['mp4', 'webm'];
+  const fileExtension = file.name.split('.')[1];
+  let fileType;
 
   if (imageFileTypes.includes(fileExtension)) { 
     fileType = 'image';
@@ -80,13 +85,13 @@ function getFileType(file) {
 };
 
 
-function handleFileUpload(file) {
-  var type = getFileType(file);
+function handleFileUpload(file, renderCanvas, databender, granularSynth) {
+  const type = getFileType(file);
   switch (type) { 
     case 'image': 
-      return handleImageUpload(file);
+      return handleImageUpload(file, renderCanvas, databender, granularSynth);
     case 'video':
-      return handleVideoUpload(file);
+      return handleVideoUpload(file, renderCanvas, databender, granularSynth);
     default:
       alert('File Type is not supported');
       return false;
@@ -105,20 +110,20 @@ function loadTrack () {
 
 function main () {
   loadTrack();
-  audioCtx = new AudioContext();
-  var renderCanvas = document.querySelector('#canvas');
-  var upload = document.querySelector('.upload');
-  var fileUpload = document.querySelector('input[type=file]');
+  const audioCtx = new AudioContext();
+  const renderCanvas = document.querySelector('#canvas');
+  const upload = document.querySelector('.upload');
+  const fileUpload = document.querySelector('input[type=file]');
   upload.ondragover = function () { this.classList.add('hover'); return false; };
   upload.ondragend = function () { this.classList.remove('hover'); return false; };
   upload.ondrop = function (e) {
     e.preventDefault();
-    databender = new Databender(audioCtx, renderCanvas);
-    granularSynth = new GranularSynth(audioCtx, databender); 
-    handleDatGUI(databender);
+    const databender = new Databender(audioCtx, renderCanvas);
+    const granularSynth = new GranularSynth(audioCtx, databender); 
+    handleDatGUI(databender, granularSynth);
     document.querySelector('.upload').style.display = 'none';
-    var files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
-    handleFileUpload(files[0]);
+    const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
+    handleFileUpload(files[0], renderCanvas, databender, granularSynth);
     audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
       granularSynth.audioBuffer = buffer;
       granularSynth.createGrains(true);
