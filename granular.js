@@ -2,8 +2,9 @@ import chunk from 'lodash.chunk';
 
 class Grain {
 
-  constructor(context, data, output, isAudio, databender) {
+  constructor(context, data, output, isAudio, databender, config) {
     this.databender = databender;
+    this.config = config;
     this.context = context;
     this.data = data;
     this.output = output;
@@ -37,28 +38,28 @@ class Grain {
       const bufferSource = this.context.createBufferSource();
       bufferSource.buffer = this.buffer;
       bufferSource.connect(this.context.destination);
-      if (this.databender.config.playAudio) {
-        const duration = this.databender.config.enableEnvelops ? this.databender.config.attack + this.databender.config.release : bufferSource.buffer.duration
-        bufferSource.start(0,this.databender.config.offset,duration);
-        bufferSource.loop = this.databender.config.loopAudio;
-        if (this.databender.config.enableEnvelopes) {
+      if (this.config.playAudio) {
+        const duration = this.config.enableEnvelops ? this.config.attack + this.config.release : bufferSource.buffer.duration
+        bufferSource.start(0, this.config.offset,duration);
+        bufferSource.loop = this.config.loopAudio;
+        if (this.config.enableEnvelopes) {
           this.gainNode.gain.setValueAtTime(0.0, 0);
-          this.gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.databender.config.attack);
-          this.gainNode.gain.linearRampToValueAtTime(0, 0 + (this.databender.config.attack + this.databender.config.release));
+          this.gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.config.attack);
+          this.gainNode.gain.linearRampToValueAtTime(0, 0 + (this.config.attack + this.config.release));
         }
       }
     } else {
-      this.databender.render(this.buffer)
-        .then(this.databender.draw.bind(this.databender))
+      this.databender.render(this.buffer, this.config)
+        .then((buffer) => this.databender.draw.call(this.databender, buffer, this.config))
     }
   };
 };
 
 class GranularSynth {
-  constructor(context, databender) {
+  constructor(context, databender, config) {
     this.context = context;
+    this.config = config;
     this.databender = databender;
-    this.config = databender.config
 
     this.output = context.createGain();
     this.output.connect(context.destination);
@@ -72,7 +73,7 @@ class GranularSynth {
     const grainSize = Math.floor(buffer.length / this.config.numberOfGrains);
     const chunks = chunk(rawData, grainSize);
     const grains = chunks.map(function(data) {
-      return new Grain(this.context, data, this.output, isAudio, this.databender)
+      return new Grain(this.context, data, this.output, isAudio, this.databender, this.config)
     }.bind(this));
 
     if (isAudio) { 
@@ -84,8 +85,8 @@ class GranularSynth {
 
   updateValues(config) { 
     this.config = config;
-    this.createGrains(true);
-    this.createGrains();
+    this.createGrains(true, config);
+    this.createGrains(false, config);
   };
 
   stop() { 
@@ -106,7 +107,7 @@ class GranularSynth {
         requestAnimationFrame(triggerGrain.bind(this));
       }
 
-      let grainIndex = this.databender.config.grainIndex;
+      let grainIndex = this.config.grainIndex;
       const interval = (this.audioGrains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
       now = Date.now();
       delta = now - then;
@@ -123,8 +124,8 @@ class GranularSynth {
           }
         }
 
-        this.audioGrains[grainIndex].trigger(true);
-        this.videoGrains[grainIndex].trigger(false);
+        this.audioGrains[grainIndex].trigger(true, this.config);
+        this.videoGrains[grainIndex].trigger(false, this.config);
 
         then = now - (delta % interval);
       }

@@ -1,15 +1,16 @@
 import Databender from './databend';
+import config from './config.json';
 import GranularSynth from './granular';
 import dat from 'dat.gui';
 
 function handleDatGUI(databender, granularSynth){
   const gui = new dat.GUI();
-  Object.keys(databender.config).forEach(function (param) {
-    gui.add(databender.config, param, 0, 2000, .01)            
+  Object.keys(config).forEach(function (param) {
+    gui.add(config, param, 0, 2000, .01)            
       .listen()
       .onFinishChange(function (value) { 
-        databender.config[param] = value;
-        granularSynth.updateValues(databender.config);
+        config[param] = value;
+        granularSynth.updateValues(config);
       });
   });
 };
@@ -28,7 +29,7 @@ function renderVideoToCanvas(v, renderCanvas, databender, granularSynth) {
   }
 
   (function repeat() {
-    time = 1000 / databender.config.frameRate;  
+    time = 1000 / config.frameRate;  
     drawFrame(v, renderCanvas);
     timer = setTimeout(repeat, time);
   }());
@@ -100,7 +101,7 @@ function handleFileUpload(file, renderCanvas, databender, granularSynth) {
 };
 
 function loadTrack () {
-  fetch('sample3.mp3')
+  fetch('sample7.mp3')
     .then((response) => response.arrayBuffer())
     .then((buffer) => {
       window.trackBuffer = buffer;
@@ -120,7 +121,7 @@ function main () {
   upload.ondrop = function (e) {
     e.preventDefault();
     const databender = new Databender(audioCtx, renderCanvas);
-    const granularSynth = new GranularSynth(audioCtx, databender); 
+    const granularSynth = new GranularSynth(audioCtx, databender, config); 
     handleDatGUI(databender, granularSynth);
     document.querySelector('.upload').style.display = 'none';
     const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
@@ -136,34 +137,34 @@ function main () {
           granularSynth.stop();
         }
         if (e.code === 'KeyP') {
-          databender.config.grainIndex = 32;          
+          config.grainIndex = 32;          
         }
         if (e.code === 'KeyO') {
-          databender.config.grainIndex = 27;          
+          config.grainIndex = 27;          
         }
         if (e.code === 'KeyI') {
-          databender.config.grainIndex = 21;          
+          config.grainIndex = 21;          
         }
         if (e.code === 'KeyU') {
-          databender.config.grainIndex = 18;          
+          config.grainIndex = 18;          
         }
         if (e.code === 'KeyY') {
-          databender.config.grainIndex = 5;          
+          config.grainIndex = 5;          
         }
         if (e.code === 'KeyT') {
-          databender.config.grainIndex = 11;          
+          config.grainIndex = 11;          
         }
         if (e.code === 'KeyR') {
-          databender.config.grainIndex = 9;          
+          config.grainIndex = 9;          
         }
         if (e.code === 'KeyE') {
-          databender.config.grainIndex = 25;          
+          config.grainIndex = 25;          
         }
         if (e.code === 'KeyW') {
-          databender.config.grainIndex = 29;          
+          config.grainIndex = 29;          
         }
         if (e.code === 'KeyQ') {
-          databender.config.grainIndex = 1;          
+          config.grainIndex = 1;          
         }
       });
     });

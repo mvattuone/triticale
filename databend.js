@@ -1,22 +1,6 @@
 class Databender { 
 
   constructor(audioCtx, renderCanvas) {
-    const defaultConfig = {
-      'loopAudio': false,
-      'loopVideo': false,
-      'attack': 0.4,
-      'enableEnvelopes': false,
-      'release': 1.5,
-      'grainIndex': 3,
-      'offset': 0,
-      'frameRate': 20,
-      'numberOfGrains': 4,
-      'walkProbability': 1,
-      'playAudio': true
-    }
-
-    this.config = Object.assign({}, defaultConfig);
-
     // Create an AudioContext or use existing one
     this.audioCtx = audioCtx ? audioCtx : new AudioContext();
     this.renderCanvas = renderCanvas;
@@ -60,7 +44,7 @@ class Databender {
     return Promise.resolve(audioBuffer); 
   }
 
-  render(buffer) {
+  render(buffer, config) {
     // Create offlineAudioCtx that will house our rendered buffer
     const offlineAudioCtx = new OfflineAudioContext(this.channels, buffer.length, this.audioCtx.sampleRate);
 
@@ -73,15 +57,15 @@ class Databender {
 
     bufferSource.connect(offlineAudioCtx.destination);
 
-    const duration = this.config.enableEnvelopes ? this.config.attack + this.config.release : bufferSource.buffer.duration;
+    const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration;
 
     //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
-    bufferSource.start(0, this.config.offset, duration);
-    bufferSource.loop = this.config.loopVideo;
-    if (this.config.enableEnvelopes) {
+    bufferSource.start(0, config.offset, duration);
+    bufferSource.loop = config.loopVideo;
+    if (config.enableEnvelopes) {
       gainNode.gain.setValueAtTime(0.0, 0);
-      gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.config.attack);
-      gainNode.gain.linearRampToValueAtTime(0, 0 + (this.config.attack + this.config.release));
+      gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
+      gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
     }
     bufferSource.connect(gainNode);
 
@@ -90,7 +74,7 @@ class Databender {
     return offlineAudioCtx.startRendering();
   };
 
-  draw(buffer) {
+  draw(buffer, config) {
     // Get buffer data
     const bufferData = buffer.getChannelData(0);
 
@@ -108,16 +92,16 @@ class Databender {
     // Okay so basically I am doing something awesome and creating a slightly larger ImageData object to handle whatever
     // segment of data we want. I have no idea what is going on with this and it's making some weird looking shit but it's kind
     // of cool so whatever!
-    const widthToApply = Math.ceil(this.imageData.width / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains))); 
-    const heightToApply = Math.ceil(this.imageData.height / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains)));
+    const widthToApply = Math.ceil(this.imageData.width / (config.numberOfGrains / Math.sqrt(config.numberOfGrains))); 
+    const heightToApply = Math.ceil(this.imageData.height / (config.numberOfGrains / Math.sqrt(config.numberOfGrains)));
 
     const transformedImage = new ImageData(widthToApply, heightToApply);
 
     transformedImage.data.set(clampedDataArray);
 
     const tmpCanvas = document.createElement('canvas');
-    tmpCanvas.width = this.imageData.width / Math.sqrt(this.config.numberOfGrains);
-    tmpCanvas.height = this.imageData.height / Math.sqrt(this.config.numberOfGrains);
+    tmpCanvas.width = this.imageData.width / Math.sqrt(config.numberOfGrains);
+    tmpCanvas.height = this.imageData.height / Math.sqrt(config.numberOfGrains);
     tmpCanvas.getContext('2d').putImageData(transformedImage, 0, 0);
     this.renderCanvas.getContext('2d').drawImage(tmpCanvas, 0, 0, 1280, 768);
   };

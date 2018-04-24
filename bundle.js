@@ -4,22 +4,6 @@
   class Databender { 
 
     constructor(audioCtx, renderCanvas) {
-      const defaultConfig = {
-        'loopAudio': false,
-        'loopVideo': false,
-        'attack': 0.4,
-        'enableEnvelopes': false,
-        'release': 1.5,
-        'grainIndex': 3,
-        'offset': 0,
-        'frameRate': 20,
-        'numberOfGrains': 4,
-        'walkProbability': 1,
-        'playAudio': true
-      };
-
-      this.config = Object.assign({}, defaultConfig);
-
       // Create an AudioContext or use existing one
       this.audioCtx = audioCtx ? audioCtx : new AudioContext();
       this.renderCanvas = renderCanvas;
@@ -63,7 +47,7 @@
       return Promise.resolve(audioBuffer); 
     }
 
-    render(buffer) {
+    render(buffer, config) {
       // Create offlineAudioCtx that will house our rendered buffer
       const offlineAudioCtx = new OfflineAudioContext(this.channels, buffer.length, this.audioCtx.sampleRate);
 
@@ -76,15 +60,15 @@
 
       bufferSource.connect(offlineAudioCtx.destination);
 
-      const duration = this.config.enableEnvelopes ? this.config.attack + this.config.release : bufferSource.buffer.duration;
+      const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration;
 
       //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
-      bufferSource.start(0, this.config.offset, duration);
-      bufferSource.loop = this.config.loopVideo;
-      if (this.config.enableEnvelopes) {
+      bufferSource.start(0, config.offset, duration);
+      bufferSource.loop = config.loopVideo;
+      if (config.enableEnvelopes) {
         gainNode.gain.setValueAtTime(0.0, 0);
-        gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.config.attack);
-        gainNode.gain.linearRampToValueAtTime(0, 0 + (this.config.attack + this.config.release));
+        gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
+        gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
       }
       bufferSource.connect(gainNode);
 
@@ -93,7 +77,7 @@
       return offlineAudioCtx.startRendering();
     };
 
-    draw(buffer) {
+    draw(buffer, config) {
       // Get buffer data
       const bufferData = buffer.getChannelData(0);
 
@@ -111,20 +95,45 @@
       // Okay so basically I am doing something awesome and creating a slightly larger ImageData object to handle whatever
       // segment of data we want. I have no idea what is going on with this and it's making some weird looking shit but it's kind
       // of cool so whatever!
-      const widthToApply = Math.ceil(this.imageData.width / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains))); 
-      const heightToApply = Math.ceil(this.imageData.height / (this.config.numberOfGrains / Math.sqrt(this.config.numberOfGrains)));
+      const widthToApply = Math.ceil(this.imageData.width / (config.numberOfGrains / Math.sqrt(config.numberOfGrains))); 
+      const heightToApply = Math.ceil(this.imageData.height / (config.numberOfGrains / Math.sqrt(config.numberOfGrains)));
 
       const transformedImage = new ImageData(widthToApply, heightToApply);
 
       transformedImage.data.set(clampedDataArray);
 
       const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width = this.imageData.width / Math.sqrt(this.config.numberOfGrains);
-      tmpCanvas.height = this.imageData.height / Math.sqrt(this.config.numberOfGrains);
+      tmpCanvas.width = this.imageData.width / Math.sqrt(config.numberOfGrains);
+      tmpCanvas.height = this.imageData.height / Math.sqrt(config.numberOfGrains);
       tmpCanvas.getContext('2d').putImageData(transformedImage, 0, 0);
       this.renderCanvas.getContext('2d').drawImage(tmpCanvas, 0, 0, 1280, 768);
     };
   }
+
+  const loopAudio = false;
+  const loopVideo = false;
+  const attack = 0.4;
+  const enableEnvelopes = false;
+  const release = 1.5;
+  const grainIndex = 3;
+  const offset = 0;
+  const frameRate = 20;
+  const numberOfGrains = 4;
+  const walkProbability = 1;
+  const playAudio = true;
+  var config = {
+  	loopAudio: loopAudio,
+  	loopVideo: loopVideo,
+  	attack: attack,
+  	enableEnvelopes: enableEnvelopes,
+  	release: release,
+  	grainIndex: grainIndex,
+  	offset: offset,
+  	frameRate: frameRate,
+  	numberOfGrains: numberOfGrains,
+  	walkProbability: walkProbability,
+  	playAudio: playAudio
+  };
 
   /**
    * lodash (Custom Build) <https://lodash.com/>
@@ -604,8 +613,9 @@
 
   class Grain {
 
-    constructor(context, data, output, isAudio, databender) {
+    constructor(context, data, output, isAudio, databender, config) {
       this.databender = databender;
+      this.config = config;
       this.context = context;
       this.data = data;
       this.output = output;
@@ -639,27 +649,27 @@
         const bufferSource = this.context.createBufferSource();
         bufferSource.buffer = this.buffer;
         bufferSource.connect(this.context.destination);
-        if (this.databender.config.playAudio) {
-          const duration = this.databender.config.enableEnvelops ? this.databender.config.attack + this.databender.config.release : bufferSource.buffer.duration;
-          bufferSource.start(0,this.databender.config.offset,duration);
-          bufferSource.loop = this.databender.config.loopAudio;
-          if (this.databender.config.enableEnvelopes) {
+        if (this.config.playAudio) {
+          const duration = this.config.enableEnvelops ? this.config.attack + this.config.release : bufferSource.buffer.duration;
+          bufferSource.start(0, this.config.offset,duration);
+          bufferSource.loop = this.config.loopAudio;
+          if (this.config.enableEnvelopes) {
             this.gainNode.gain.setValueAtTime(0.0, 0);
-            this.gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.databender.config.attack);
-            this.gainNode.gain.linearRampToValueAtTime(0, 0 + (this.databender.config.attack + this.databender.config.release));
+            this.gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.config.attack);
+            this.gainNode.gain.linearRampToValueAtTime(0, 0 + (this.config.attack + this.config.release));
           }
         }
       } else {
-        this.databender.render(this.buffer)
-          .then(this.databender.draw.bind(this.databender));
+        this.databender.render(this.buffer, this.config)
+          .then((buffer) => this.databender.draw.call(this.databender, buffer, this.config));
       }
     };
   }
   class GranularSynth {
-    constructor(context, databender) {
+    constructor(context, databender, config) {
       this.context = context;
+      this.config = config;
       this.databender = databender;
-      this.config = databender.config;
 
       this.output = context.createGain();
       this.output.connect(context.destination);
@@ -673,7 +683,7 @@
       const grainSize = Math.floor(buffer.length / this.config.numberOfGrains);
       const chunks = lodash_chunk(rawData, grainSize);
       const grains = chunks.map(function(data) {
-        return new Grain(this.context, data, this.output, isAudio, this.databender)
+        return new Grain(this.context, data, this.output, isAudio, this.databender, this.config)
       }.bind(this));
 
       if (isAudio) { 
@@ -685,8 +695,8 @@
 
     updateValues(config) { 
       this.config = config;
-      this.createGrains(true);
-      this.createGrains();
+      this.createGrains(true, config);
+      this.createGrains(false, config);
     };
 
     stop() { 
@@ -707,7 +717,7 @@
           requestAnimationFrame(triggerGrain.bind(this));
         }
 
-        let grainIndex = this.databender.config.grainIndex;
+        let grainIndex = this.config.grainIndex;
         const interval = (this.audioGrains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
         now = Date.now();
         delta = now - then;
@@ -724,8 +734,8 @@
             }
           }
 
-          this.audioGrains[grainIndex].trigger(true);
-          this.videoGrains[grainIndex].trigger(false);
+          this.audioGrains[grainIndex].trigger(true, this.config);
+          this.videoGrains[grainIndex].trigger(false, this.config);
 
           then = now - (delta % interval);
         }
@@ -3252,12 +3262,12 @@
 
   function handleDatGUI(databender, granularSynth){
     const gui = new index.GUI();
-    Object.keys(databender.config).forEach(function (param) {
-      gui.add(databender.config, param, 0, 2000, .01)            
+    Object.keys(config).forEach(function (param) {
+      gui.add(config, param, 0, 2000, .01)            
         .listen()
         .onFinishChange(function (value) { 
-          databender.config[param] = value;
-          granularSynth.updateValues(databender.config);
+          config[param] = value;
+          granularSynth.updateValues(config);
         });
     });
   }
@@ -3275,7 +3285,7 @@
     }
 
     (function repeat() {
-      time = 1000 / databender.config.frameRate;  
+      time = 1000 / config.frameRate;  
       drawFrame(v, renderCanvas);
       timer = setTimeout(repeat, time);
     }());
@@ -3344,7 +3354,7 @@
     }
   }
   function loadTrack () {
-    fetch('sample3.mp3')
+    fetch('sample7.mp3')
       .then((response) => response.arrayBuffer())
       .then((buffer) => {
         window.trackBuffer = buffer;
@@ -3363,7 +3373,7 @@
     upload.ondrop = function (e) {
       e.preventDefault();
       const databender = new Databender(audioCtx, renderCanvas);
-      const granularSynth = new GranularSynth(audioCtx, databender); 
+      const granularSynth = new GranularSynth(audioCtx, databender, config); 
       handleDatGUI(databender, granularSynth);
       document.querySelector('.upload').style.display = 'none';
       const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
@@ -3379,34 +3389,34 @@
             granularSynth.stop();
           }
           if (e.code === 'KeyP') {
-            databender.config.grainIndex = 32;          
+            config.grainIndex = 32;          
           }
           if (e.code === 'KeyO') {
-            databender.config.grainIndex = 27;          
+            config.grainIndex = 27;          
           }
           if (e.code === 'KeyI') {
-            databender.config.grainIndex = 21;          
+            config.grainIndex = 21;          
           }
           if (e.code === 'KeyU') {
-            databender.config.grainIndex = 18;          
+            config.grainIndex = 18;          
           }
           if (e.code === 'KeyY') {
-            databender.config.grainIndex = 5;          
+            config.grainIndex = 5;          
           }
           if (e.code === 'KeyT') {
-            databender.config.grainIndex = 11;          
+            config.grainIndex = 11;          
           }
           if (e.code === 'KeyR') {
-            databender.config.grainIndex = 9;          
+            config.grainIndex = 9;          
           }
           if (e.code === 'KeyE') {
-            databender.config.grainIndex = 25;          
+            config.grainIndex = 25;          
           }
           if (e.code === 'KeyW') {
-            databender.config.grainIndex = 29;          
+            config.grainIndex = 29;          
           }
           if (e.code === 'KeyQ') {
-            databender.config.grainIndex = 1;          
+            config.grainIndex = 1;          
           }
         });
       });
