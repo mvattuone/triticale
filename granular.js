@@ -39,7 +39,7 @@ class Grain {
       bufferSource.buffer = this.buffer;
       bufferSource.connect(this.context.destination);
       if (this.config.playAudio) {
-        const duration = this.config.enableEnvelops ? this.config.attack + this.config.release : bufferSource.buffer.duration
+        const duration = this.config.enableEnvelopes ? this.config.attack + this.config.release : bufferSource.buffer.duration
         bufferSource.start(0, this.config.offset,duration);
         bufferSource.loop = this.config.loopAudio;
         if (this.config.enableEnvelopes) {
@@ -118,9 +118,9 @@ class GranularSynth {
           if (toggle > 0.6) {
             grainIndex = Math.min(this.audioGrains.length - 1, grainIndex + 1);
           } else if (toggle < 0.4) {
-            grainIndex = Math.max(Math.floor(Math.random() * this.audioGrains.length) - 1, 0);
+            grainIndex = Math.floor(Math.random() * this.audioGrains.length) - 1;
           } else {
-            grainIndex = Math.max(0, grainIndex - 1);
+            grainIndex = grainIndex - 1;
           }
         }
 

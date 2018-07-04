@@ -6,7 +6,7 @@ import dat from 'dat.gui';
 function handleDatGUI(databender, granularSynth){
   const gui = new dat.GUI();
   Object.keys(config).forEach(function (param) {
-    gui.add(config, param, 0, 2000, .01)            
+    gui.add(config, param, 0, 2000, 1)
       .listen()
       .onFinishChange(function (value) { 
         config[param] = value;
@@ -101,7 +101,7 @@ function handleFileUpload(file, renderCanvas, databender, granularSynth) {
 };
 
 function loadTrack () {
-  fetch('sample7.mp3')
+  fetch('audience.mp3')
     .then((response) => response.arrayBuffer())
     .then((buffer) => {
       window.trackBuffer = buffer;
