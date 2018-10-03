@@ -5,7 +5,8 @@
   "main": "main.js",
   "dependencies": {
     "dat.gui": "^0.7.1",
-    "lodash.chunk": "^4.2.0"
+    "lodash.chunk": "^4.2.0",
+    "tunajs": "^1.0.1"
   },
   "devDependencies": {
     "rollup": "^0.58.1",

@@ -1,79 +1,91 @@
-class Databender { 
+var effects = require('./effects');
+var Tuna = require('tunajs');
 
-  constructor(audioCtx, renderCanvas) {
-    // Create an AudioContext or use existing one
-    this.audioCtx = audioCtx ? audioCtx : new AudioContext();
-    this.renderCanvas = renderCanvas;
+// Create a Databender instance
+module.exports = function (config, audioCtx) {
+  this.audioCtx = audioCtx ? audioCtx : new AudioContext();
+  this.channels = 1; 
+  this.config = config;
+  this.configKeys = Object.keys(this.config);
+  this.previousConfig = this.config;
 
-    this.channels = 1; // @TODO - What would multiple channels look like?
-    this.bend = this.bend.bind(this);
-    this.render = this.render.bind(this);
-    this.draw = this.draw.bind(this);
-  }
-
-  bend(image) {
-    let imageData; 
-
-    if (!image) {
-      return;
-    }
-
+  this.convert = function (image) {
     if (image instanceof Image || image instanceof HTMLVideoElement) {
-      const canvas = document.createElement('canvas');
-      // these are potentially interesting controls for creating a glitch-like effect (stretched pixels)
-      canvas.width = image.width || 1280; 
-      canvas.height = image.height || 768;
-      const context = canvas.getContext('2d');
+      var canvas = document.createElement('canvas');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      var context = canvas.getContext('2d');
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     }
-
     this.imageData = imageData || image;
-    const bufferSize = this.imageData.data.length / this.channels;
+    var bufferSize = this.imageData.data.length / this.channels;
 
     // Make an audioBuffer on the audioContext to pass to the offlineAudioCtx AudioBufferSourceNode
-    const audioBuffer = this.audioCtx.createBuffer(this.channels, bufferSize, this.audioCtx.sampleRate); 
+    var audioBuffer = this.audioCtx.createBuffer(this.channels, bufferSize, this.audioCtx.sampleRate); 
 
     // This gives us the actual ArrayBuffer that contains the data
-    const nowBuffering = audioBuffer.getChannelData(0);
+    var nowBuffering = audioBuffer.getChannelData(0);
 
-    // set the AudioBuffer buffer to the same as the imageData audioBuffer
-    // v. convenient becuase you do not need to convert the data yourself
     nowBuffering.set(this.imageData.data);
 
-    return Promise.resolve(audioBuffer); 
+    return Promise.resolve(audioBuffer);
   }
 
-  render(buffer, config) {
+  this.configHasChanged = function () { 
+    return JSON.stringify(this.previousConfig) !== JSON.stringify(this.config);
+  }
+
+  this.render = function (buffer, bypass = false) {
+
     // Create offlineAudioCtx that will house our rendered buffer
-    const offlineAudioCtx = new OfflineAudioContext(this.channels, buffer.length, this.audioCtx.sampleRate);
+    var offlineAudioCtx = new OfflineAudioContext(this.channels, buffer.length * this.channels, this.audioCtx.sampleRate);
+
+    var tuna = new Tuna(offlineAudioCtx);
 
     // Create an AudioBufferSourceNode, which represents an audio source consisting of in-memory audio data
-    const bufferSource = offlineAudioCtx.createBufferSource();
-    const gainNode = offlineAudioCtx.createGain();
+    var bufferSource = offlineAudioCtx.createBufferSource();
 
     // Set buffer to audio buffer containing image data
     bufferSource.buffer = buffer; 
 
-    bufferSource.connect(offlineAudioCtx.destination);
+    var activeEffects = this.configKeys.reduce((acc, cur) => {
+      this.config[cur].active ? acc[cur] = effects[cur] : false; 
+      return acc;
+    }, {});
+    var activeEffectsIndex = Object.keys(activeEffects);
 
-    bufferSource.loop = config.loopVideo;
-    if (config.enableEnvelopes) {
-      bufferSource.detune.setValueAtTime(0.0, 0);
-      bufferSource.detune.linearRampToValueAtTime(Math.random(),0 + config.attack);
-      bufferSource.detune.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
+    bufferSource.start();
+
+    if (activeEffectsIndex && activeEffectsIndex.length) {
+      activeEffectsIndex.forEach((effect) => {
+        if (effect === 'detune' || effect === 'playbackRate') {
+          effects[effect](this.config, tuna, bufferSource);
+          activeEffectsIndex.pop();
+        }
+      });
     }
 
-    //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
-    bufferSource.start(0, config.offset);
-    bufferSource.connect(gainNode);
+    if (!activeEffectsIndex.length) {
+      bufferSource.connect(offlineAudioCtx.destination);
+    } else {
+      var nodes = activeEffectsIndex.map((effect) => { 
+        const context = effect === 'biquad' ? offlineAudioCtx : tuna
+        return effects[effect](this.config, context, bufferSource);
+      }).filter(Boolean);
 
+      nodes.forEach((node) => { 
+        bufferSource.connect(node);
+        node.connect(offlineAudioCtx.destination);
+      });
+    }
 
+    this.previousConfig = this.config; 
     // Kick off the render, callback will contain rendered buffer in event
     return offlineAudioCtx.startRendering();
   };
 
-  draw(buffer, context, x = 0, y = 0, sourceWidth = this.imageData.width, sourceHeight = this.imageData.height) {
+  this.draw = function (buffer, context, x = 0, y = 0, sourceWidth = this.imageData.width, sourceHeight = this.imageData.height) {
     // Get buffer data
     var bufferData = buffer.getChannelData(0);
 
@@ -95,6 +107,12 @@ class Databender {
     tmpCanvas.getContext('2d').putImageData(transformedImageData, x, y);
     context.drawImage(tmpCanvas, x, y, sourceWidth, sourceHeight, x, y, 1280, 768);
   };
-};
 
-export default Databender;
+  this.bend = function (data, context, x = 0, y = 0) { 
+    return this.convert(data)
+      .then((buffer) => this.render(buffer))
+      .then((buffer) => this.draw(buffer, context, x, y))
+  };
+
+  return this;
+};

@@ -22,7 +22,7 @@ function renderVideoToCanvas(v, renderCanvas, databender, videoGranularSynth) {
 
   function drawFrame() {
     if(v.paused || v.ended) return false;
-    databender.bend(v)
+    databender.convert(v)
       .then((buffer) => {
         videoGranularSynth.createGrains(buffer);
       })
@@ -40,7 +40,7 @@ function handleImageUpload (file, renderCanvas, databender, videoGranularSynth) 
   reader.onload = function (e) {
     const img = new Image();
     img.onload = function () {
-      databender.bend(img)
+      databender.convert(img)
         .then((buffer) => {
           videoGranularSynth.createGrains(buffer);
         })
@@ -119,7 +119,7 @@ function main () {
   upload.ondragend = function () { this.classList.remove('hover'); return false; };
   upload.ondrop = function (e) {
     e.preventDefault();
-    const databender = new Databender(audioCtx, renderCanvas);
+    const databender = new Databender(config, audioCtx);
     const audioGranularSynth = new GranularSynth(audioCtx, config); 
     const videoGranularSynth = new GranularSynth(audioCtx, config); 
     handleDatGUI(databender, audioGranularSynth, videoGranularSynth);
@@ -130,7 +130,7 @@ function main () {
       audioGranularSynth.createGrains(buffer);
 
       const audioTriggerCallback = (originalBuffer, gainNode) => {
-        databender.render(originalBuffer, config)
+        databender.render(originalBuffer)
           .then((buffer) => {
               const bufferSource = audioCtx.createBufferSource();
               bufferSource.buffer = buffer;
@@ -143,7 +143,7 @@ function main () {
       }
 
       const videoTriggerCallback = (originalBuffer) => {
-        databender.render(originalBuffer, config)
+        databender.render(originalBuffer)
           .then((buffer) => databender.draw(buffer, renderCanvas.getContext('2d'), 0, 0, databender.imageData.width, databender.imageData.height/config.numberOfGrains))
       }
 
