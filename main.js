@@ -3,19 +3,20 @@ import config from './config.json';
 import GranularSynth from './granular';
 import dat from 'dat.gui';
 
-function handleDatGUI(databender, granularSynth){
+function handleDatGUI(databender, audioGranularSynth, videoGranularSynth){
   const gui = new dat.GUI();
   Object.keys(config).forEach(function (param) {
     gui.add(config, param, 0, 2000, 1)
       .listen()
       .onFinishChange(function (value) { 
         config[param] = value;
-        granularSynth.updateValues(config);
+        audioGranularSynth.updateValues(config);
+        videoGranularSynth.updateValues(config);
       });
   });
 };
 
-function renderVideoToCanvas(v, renderCanvas, databender, granularSynth) {
+function renderVideoToCanvas(v, renderCanvas, databender, videoGranularSynth) {
   let timer;
   let time;
 
@@ -23,8 +24,7 @@ function renderVideoToCanvas(v, renderCanvas, databender, granularSynth) {
     if(v.paused || v.ended) return false;
     databender.bend(v)
       .then((buffer) => {
-        granularSynth.videoBuffer = buffer;
-        granularSynth.createGrains();
+        videoGranularSynth.createGrains(buffer);
       })
   }
 
@@ -35,15 +35,14 @@ function renderVideoToCanvas(v, renderCanvas, databender, granularSynth) {
   }());
 }
 
-function handleImageUpload (file, renderCanvas, databender, granularSynth) {
+function handleImageUpload (file, renderCanvas, databender, videoGranularSynth) {
   const reader = new FileReader();
   reader.onload = function (e) {
     const img = new Image();
     img.onload = function () {
       databender.bend(img)
         .then((buffer) => {
-          granularSynth.videoBuffer = buffer;
-          granularSynth.createGrains();
+          videoGranularSynth.createGrains(buffer);
         })
     };
     img.src = e.target.result;
@@ -51,12 +50,12 @@ function handleImageUpload (file, renderCanvas, databender, granularSynth) {
   reader.readAsDataURL(file);
 }; 
 
-function handleVideoUpload(file, renderCanvas, databender, granularSynth){
+function handleVideoUpload(file, renderCanvas, databender, videoGranularSynth){
   const reader = new FileReader();
   const video = document.createElement('video');
 
   video.addEventListener('play', () =>
-    renderVideoToCanvas(video, renderCanvas, databender, granularSynth)
+    renderVideoToCanvas(video, renderCanvas, databender, videoGranularSynth)
   , false);
 
   reader.onload = function (event) {
@@ -87,13 +86,13 @@ function getFileType(file) {
 };
 
 
-function handleFileUpload(file, renderCanvas, databender, granularSynth) {
+function handleFileUpload(file, renderCanvas, databender, videoGranularSynth) {
   const type = getFileType(file);
   switch (type) { 
     case 'image': 
-      return handleImageUpload(file, renderCanvas, databender, granularSynth);
+      return handleImageUpload(file, renderCanvas, databender, videoGranularSynth);
     case 'video':
-      return handleVideoUpload(file, renderCanvas, databender, granularSynth);
+      return handleVideoUpload(file, renderCanvas, databender, videoGranularSynth);
     default:
       alert('File Type is not supported');
       return false;
@@ -121,42 +120,44 @@ function main () {
   upload.ondrop = function (e) {
     e.preventDefault();
     const databender = new Databender(audioCtx, renderCanvas);
-    const granularSynth = new GranularSynth(audioCtx, databender, config); 
-    handleDatGUI(databender, granularSynth);
+    const audioGranularSynth = new GranularSynth(audioCtx, config); 
+    const videoGranularSynth = new GranularSynth(audioCtx, config); 
+    handleDatGUI(databender, audioGranularSynth, videoGranularSynth);
     document.querySelector('.upload').style.display = 'none';
     const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
-    handleFileUpload(files[0], renderCanvas, databender, granularSynth);
+    handleFileUpload(files[0], renderCanvas, databender, videoGranularSynth);
     audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
-      granularSynth.audioBuffer = buffer;
-      granularSynth.createGrains(true);
+      audioGranularSynth.createGrains(buffer);
 
-      const handleTrigger = (isAudio, originalBuffer, gainNode) => {
-        if (isAudio) {
-          const bufferSource = audioCtx.createBufferSource();
-          bufferSource.buffer = originalBuffer;
-          bufferSource.connect(audioCtx.destination);
-          if (config.playAudio) {
-            const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration
-            bufferSource.start(0, config.offset,duration);
-            bufferSource.loop = config.loopAudio;
-            if (config.enableEnvelopes) {
-              gainNode.gain.setValueAtTime(0.0, 0);
-              gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
-              gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
-            }
+      const audioTriggerCallback = (originalBuffer, gainNode) => {
+        const bufferSource = audioCtx.createBufferSource();
+        bufferSource.buffer = originalBuffer;
+        bufferSource.connect(audioCtx.destination);
+        if (config.playAudio) {
+          const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration
+          bufferSource.start(0, config.offset,duration);
+          bufferSource.loop = config.loopAudio;
+          if (config.enableEnvelopes) {
+            gainNode.gain.setValueAtTime(0.0, 0);
+            gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
+            gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
           }
-        } else {
-          databender.render(originalBuffer, config)
-            .then((buffer) => databender.draw.call(databender, buffer, config))
         }
+      }
+
+      const videoTriggerCallback = (originalBuffer) => {
+        databender.render(originalBuffer, config)
+          .then((buffer) => databender.draw.call(databender, buffer, config))
       }
 
       document.addEventListener('keypress', (e) => {
         if (e.code === 'Enter') {
-          granularSynth.play(handleTrigger);
+          audioGranularSynth.play(audioTriggerCallback);
+          videoGranularSynth.play(videoTriggerCallback);
         }
         if (e.code === 'Backslash') {
-          granularSynth.stop();
+          audioGranularSynth.stop();
+          videoGranularSynth.stop();
         }
         if (e.code === 'KeyP') {
           config.grainIndex = 32;          
