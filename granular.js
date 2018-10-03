@@ -2,8 +2,7 @@ import chunk from 'lodash.chunk';
 
 class Grain {
 
-  constructor(context, data, output, isAudio, databender, config) {
-    this.databender = databender;
+  constructor(context, data, output, isAudio, config) {
     this.config = config;
     this.context = context;
     this.data = data;
@@ -33,34 +32,15 @@ class Grain {
     this.gainNode.connect(this.output);
   };
 
-  trigger(isAudio) {
-    if (isAudio) {
-      const bufferSource = this.context.createBufferSource();
-      bufferSource.buffer = this.buffer;
-      bufferSource.connect(this.context.destination);
-      if (this.config.playAudio) {
-        const duration = this.config.enableEnvelopes ? this.config.attack + this.config.release : bufferSource.buffer.duration
-        bufferSource.start(0, this.config.offset,duration);
-        bufferSource.loop = this.config.loopAudio;
-        if (this.config.enableEnvelopes) {
-          this.gainNode.gain.setValueAtTime(0.0, 0);
-          this.gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.config.attack);
-          this.gainNode.gain.linearRampToValueAtTime(0, 0 + (this.config.attack + this.config.release));
-        }
-      }
-    } else {
-      this.databender.render(this.buffer, this.config)
-        .then((buffer) => this.databender.draw.call(this.databender, buffer, this.config))
-    }
+  trigger(isAudio, callback) {
+    callback(isAudio, this.buffer, this.gainNode)
   };
 };
 
 class GranularSynth {
-  constructor(context, databender, config) {
+  constructor(context, config) {
     this.context = context;
     this.config = config;
-    this.databender = databender;
-
     this.output = context.createGain();
     this.output.connect(context.destination);
 
@@ -73,7 +53,7 @@ class GranularSynth {
     const grainSize = Math.floor(buffer.length / this.config.numberOfGrains);
     const chunks = chunk(rawData, grainSize);
     const grains = chunks.map(function(data) {
-      return new Grain(this.context, data, this.output, isAudio, this.databender, this.config)
+      return new Grain(this.context, data, this.output, isAudio, this.config)
     }.bind(this));
 
     if (isAudio) { 
@@ -95,7 +75,7 @@ class GranularSynth {
     return;
   };
 
-  play() {
+  play(callback) {
     this.stopLoop = false;
     const nextGrainTime = this.context.currentTime;
     let now;
@@ -124,8 +104,8 @@ class GranularSynth {
           }
         }
 
-        this.audioGrains[grainIndex].trigger(true, this.config);
-        this.videoGrains[grainIndex].trigger(false, this.config);
+        this.audioGrains[grainIndex].trigger(true, callback);
+        this.videoGrains[grainIndex].trigger(false, callback);
 
         then = now - (delta % interval);
       }

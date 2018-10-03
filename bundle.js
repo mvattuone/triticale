@@ -612,8 +612,7 @@
 
   class Grain {
 
-    constructor(context, data, output, isAudio, databender, config) {
-      this.databender = databender;
+    constructor(context, data, output, isAudio, config) {
       this.config = config;
       this.context = context;
       this.data = data;
@@ -643,33 +642,14 @@
       this.gainNode.connect(this.output);
     };
 
-    trigger(isAudio) {
-      if (isAudio) {
-        const bufferSource = this.context.createBufferSource();
-        bufferSource.buffer = this.buffer;
-        bufferSource.connect(this.context.destination);
-        if (this.config.playAudio) {
-          const duration = this.config.enableEnvelopes ? this.config.attack + this.config.release : bufferSource.buffer.duration;
-          bufferSource.start(0, this.config.offset,duration);
-          bufferSource.loop = this.config.loopAudio;
-          if (this.config.enableEnvelopes) {
-            this.gainNode.gain.setValueAtTime(0.0, 0);
-            this.gainNode.gain.linearRampToValueAtTime(Math.random(),0 + this.config.attack);
-            this.gainNode.gain.linearRampToValueAtTime(0, 0 + (this.config.attack + this.config.release));
-          }
-        }
-      } else {
-        this.databender.render(this.buffer, this.config)
-          .then((buffer) => this.databender.draw.call(this.databender, buffer, this.config));
-      }
+    trigger(isAudio, callback) {
+      callback(isAudio, this.buffer, this.gainNode);
     };
   }
   class GranularSynth {
-    constructor(context, databender, config) {
+    constructor(context, config) {
       this.context = context;
       this.config = config;
-      this.databender = databender;
-
       this.output = context.createGain();
       this.output.connect(context.destination);
 
@@ -682,7 +662,7 @@
       const grainSize = Math.floor(buffer.length / this.config.numberOfGrains);
       const chunks = lodash_chunk(rawData, grainSize);
       const grains = chunks.map(function(data) {
-        return new Grain(this.context, data, this.output, isAudio, this.databender, this.config)
+        return new Grain(this.context, data, this.output, isAudio, this.config)
       }.bind(this));
 
       if (isAudio) { 
@@ -704,7 +684,7 @@
       return;
     };
 
-    play() {
+    play(callback) {
       this.stopLoop = false;
       const nextGrainTime = this.context.currentTime;
       let now;
@@ -733,8 +713,8 @@
             }
           }
 
-          this.audioGrains[grainIndex].trigger(true, this.config);
-          this.videoGrains[grainIndex].trigger(false, this.config);
+          this.audioGrains[grainIndex].trigger(true, callback);
+          this.videoGrains[grainIndex].trigger(false, callback);
 
           then = now - (delta % interval);
         }
@@ -3380,9 +3360,31 @@
       audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
         granularSynth.audioBuffer = buffer;
         granularSynth.createGrains(true);
+
+        const handleTrigger = (isAudio, originalBuffer, gainNode) => {
+          if (isAudio) {
+            const bufferSource = audioCtx.createBufferSource();
+            bufferSource.buffer = originalBuffer;
+            bufferSource.connect(audioCtx.destination);
+            if (config.playAudio) {
+              const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration;
+              bufferSource.start(0, config.offset,duration);
+              bufferSource.loop = config.loopAudio;
+              if (config.enableEnvelopes) {
+                gainNode.gain.setValueAtTime(0.0, 0);
+                gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
+                gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
+              }
+            }
+          } else {
+            databender.render(originalBuffer, config)
+              .then((buffer) => databender.draw.call(databender, buffer, config));
+          }
+        };
+
         document.addEventListener('keypress', (e) => {
           if (e.code === 'Enter') {
-            granularSynth.play();
+            granularSynth.play(handleTrigger);
           }
           if (e.code === 'Backslash') {
             granularSynth.stop();

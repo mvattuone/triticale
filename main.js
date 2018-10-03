@@ -129,9 +129,31 @@ function main () {
     audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
       granularSynth.audioBuffer = buffer;
       granularSynth.createGrains(true);
+
+      const handleTrigger = (isAudio, originalBuffer, gainNode) => {
+        if (isAudio) {
+          const bufferSource = audioCtx.createBufferSource();
+          bufferSource.buffer = originalBuffer;
+          bufferSource.connect(audioCtx.destination);
+          if (config.playAudio) {
+            const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration
+            bufferSource.start(0, config.offset,duration);
+            bufferSource.loop = config.loopAudio;
+            if (config.enableEnvelopes) {
+              gainNode.gain.setValueAtTime(0.0, 0);
+              gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
+              gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
+            }
+          }
+        } else {
+          databender.render(originalBuffer, config)
+            .then((buffer) => databender.draw.call(databender, buffer, config))
+        }
+      }
+
       document.addEventListener('keypress', (e) => {
         if (e.code === 'Enter') {
-          granularSynth.play();
+          granularSynth.play(handleTrigger);
         }
         if (e.code === 'Backslash') {
           granularSynth.stop();
