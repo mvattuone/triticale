@@ -130,19 +130,16 @@ function main () {
       audioGranularSynth.createGrains(buffer);
 
       const audioTriggerCallback = (originalBuffer, gainNode) => {
-        const bufferSource = audioCtx.createBufferSource();
-        bufferSource.buffer = originalBuffer;
-        bufferSource.connect(audioCtx.destination);
-        if (config.playAudio) {
-          const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration
-          bufferSource.start(0, config.offset,duration);
-          bufferSource.loop = config.loopAudio;
-          if (config.enableEnvelopes) {
-            gainNode.gain.setValueAtTime(0.0, 0);
-            gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
-            gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
-          }
-        }
+        databender.render(originalBuffer, config)
+          .then((buffer) => {
+              const bufferSource = audioCtx.createBufferSource();
+              bufferSource.buffer = buffer;
+              bufferSource.loop = config.loopAudio;
+              bufferSource.connect(audioCtx.destination);
+            if (config.playAudio) {
+              bufferSource.start(0);
+            }
+          });
       }
 
       const videoTriggerCallback = (originalBuffer) => {
