@@ -57,16 +57,15 @@ class Databender {
 
     bufferSource.connect(offlineAudioCtx.destination);
 
-    const duration = config.enableEnvelopes ? config.attack + config.release : bufferSource.buffer.duration;
-
-    //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
-    bufferSource.start(0, config.offset, duration);
     bufferSource.loop = config.loopVideo;
     if (config.enableEnvelopes) {
-      gainNode.gain.setValueAtTime(0.0, 0);
-      gainNode.gain.linearRampToValueAtTime(Math.random(),0 + config.attack);
-      gainNode.gain.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
+      bufferSource.detune.setValueAtTime(0.0, 0);
+      bufferSource.detune.linearRampToValueAtTime(Math.random(),0 + config.attack);
+      bufferSource.detune.linearRampToValueAtTime(0, 0 + (config.attack + config.release));
     }
+
+    //  @NOTE: Calling this is when the AudioBufferSourceNode becomes unusable
+    bufferSource.start(0, config.offset);
     bufferSource.connect(gainNode);
 
 
