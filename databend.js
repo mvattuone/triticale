@@ -36,6 +36,10 @@ module.exports = function (config, audioCtx) {
     return JSON.stringify(this.previousConfig) !== JSON.stringify(this.config);
   }
 
+  this.updateConfig = function (effect, param, value) {
+    this.config[effect][param] = value;
+  }
+
   this.render = function (buffer, bypass = false) {
 
     // Create offlineAudioCtx that will house our rendered buffer
@@ -85,7 +89,7 @@ module.exports = function (config, audioCtx) {
     return offlineAudioCtx.startRendering();
   };
 
-  this.draw = function (buffer, context, x = 0, y = 0, sourceWidth = this.imageData.width, sourceHeight = this.imageData.height) {
+  this.draw = function (buffer, context, x = 0, y = 0, sourceWidth = this.imageData.width, sourceHeight = this.imageData.height, targetWidth, targetHeight) {
     // Get buffer data
     var bufferData = buffer.getChannelData(0);
 
@@ -105,13 +109,13 @@ module.exports = function (config, audioCtx) {
     tmpCanvas.width = this.imageData.width;
     tmpCanvas.height = this.imageData.height;
     tmpCanvas.getContext('2d').putImageData(transformedImageData, x, y);
-    context.drawImage(tmpCanvas, x, y, sourceWidth, sourceHeight, x, y, 1280, 768);
+    context.drawImage(tmpCanvas, x, y, sourceWidth, sourceHeight, x, y, targetWidth, targetHeight);
   };
 
-  this.bend = function (data, context, x = 0, y = 0) { 
+  this.bend = function (data, context, x = 0, y = 0, targetWidth, targetHeight) { 
     return this.convert(data)
       .then((buffer) => this.render(buffer))
-      .then((buffer) => this.draw(buffer, context, x, y))
+      .then((buffer) => this.draw(buffer, context, x, y, this.imageData.width, this.imageData.height, targetWidth, targetHeight))
   };
 
   return this;
