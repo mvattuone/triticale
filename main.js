@@ -1,4 +1,4 @@
-import Databender from './databend';
+import Databender from 'databender';
 import config from './config.json';
 import GranularSynth from './granular';
 import dat from 'dat.gui';

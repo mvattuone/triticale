@@ -5,6 +5,7 @@
   "main": "main.js",
   "dependencies": {
     "dat.gui": "^0.7.1",
+    "databender": "file:../databender",
     "lodash.chunk": "^4.2.0",
     "tunajs": "^1.0.1"
   },
