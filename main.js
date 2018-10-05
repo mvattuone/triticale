@@ -144,7 +144,7 @@ function main () {
 
       const videoTriggerCallback = (originalBuffer) => {
         databender.render(originalBuffer)
-          .then((buffer) => databender.draw(buffer, renderCanvas.getContext('2d'), 0, 0, databender.imageData.width, databender.imageData.height/config.numberOfGrains))
+          .then((buffer) => databender.draw(buffer, renderCanvas.getContext('2d'), 0, 0, 0, 0, databender.imageData.width, databender.imageData.height/config.numberOfGrains))
       }
 
       document.addEventListener('keypress', (e) => {
