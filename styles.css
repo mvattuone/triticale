@@ -2,18 +2,15 @@ body {
   margin: 0;
 }
 
-.upload {
+.dropzone {
   border: 1px solid #000;
   margin: 0 auto;
   width:500px;
   height:500px;
-}
-
-.upload {
   text-align: center;
 }
 
-.upload.hover {
+.dropzone.hover {
   background-color: cyan;
 }
 

@@ -2546,7 +2546,6 @@
   const enableEnvelopes = false;
   const release = 1.5;
   const grainIndex = 3;
-  const grainLength = 500;
   const offset = 0;
   const frameRate = 20;
   const numberOfGrains = 4;
@@ -2559,7 +2558,6 @@
   	enableEnvelopes: enableEnvelopes,
   	release: release,
   	grainIndex: grainIndex,
-  	grainLength: grainLength,
   	offset: offset,
   	frameRate: frameRate,
   	numberOfGrains: numberOfGrains,
@@ -5761,34 +5759,36 @@
         return false;
     }
   }
-  function loadTrack () {
-    fetch('sample5.m4a')
-      .then((response) => response.arrayBuffer())
-      .then((buffer) => {
-        window.trackBuffer = buffer;
-      }).catch((err) => {
-        console.error(`Error while loading: ${err}`);
-      });
-  }
   function main () {
-    loadTrack();
     var AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContext();
     const renderCanvas = document.querySelector('#canvas');
-    const upload = document.querySelector('.upload');
-    const fileUpload = document.querySelector('input[type=file]');
-    upload.ondragover = function () { this.classList.add('hover'); return false; };
-    upload.ondragend = function () { this.classList.remove('hover'); return false; };
-    upload.ondrop = function (e) {
+    const dropzone = document.querySelector('.dropzone');
+    const upload = document.querySelector('#imageUpload');
+    const audioUpload = document.querySelector('#audioUpload');
+    let audioData;
+    audioUpload.onchange = function(){
+      var files = this.files;
+      var audioFileReader = new FileReader();
+      audioFileReader.onload = () => {
+        audioData = audioFileReader.result;
+      };
+      audioFileReader.readAsArrayBuffer(files[0]);
+    };
+    dropzone.ondragover = function () { this.classList.add('hover'); return false; };
+    dropzone.ondragend = function () { this.classList.remove('hover'); return false; };
+    dropzone.ondrop = function (e) {
       e.preventDefault();
       const databender$$1 = new databender(config, audioCtx);
       const audioGranularSynth = new GranularSynth(audioCtx, config); 
       const videoGranularSynth = new GranularSynth(audioCtx, config); 
       handleDatGUI(databender$$1, audioGranularSynth, videoGranularSynth);
-      document.querySelector('.upload').style.display = 'none';
+      document.querySelector('.dropzone').style.display = 'none';
+      document.querySelector('#audioUpload').style.display = 'none';
+      document.querySelector('#imageUpload').style.display = 'none';
       const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
       handleFileUpload(files[0], renderCanvas, databender$$1, videoGranularSynth);
-      audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
+      audioCtx.decodeAudioData(audioData, function (buffer) {
         audioGranularSynth.createGrains(buffer);
 
         let bufferSource;
@@ -5796,13 +5796,11 @@
         const audioTriggerCallback = (originalBuffer, gainNode) => {
           databender$$1.render(originalBuffer)
             .then((buffer) => {
-                bufferSource = audioCtx.createBufferSource();
-                bufferSource.buffer = buffer;
-                bufferSource.loop = config.loopAudio;
-                bufferSource.connect(audioCtx.destination);
-                setTimeout(function () { 
-                  bufferSource.stop(0);
-                }, config.grainLength);
+              if (bufferSource) bufferSource.stop();
+              bufferSource = audioCtx.createBufferSource();
+              bufferSource.buffer = buffer;
+              bufferSource.loop = config.loopAudio;
+              bufferSource.connect(audioCtx.destination);
               if (config.playAudio) {
                 bufferSource.start(0);
               }

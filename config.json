@@ -5,7 +5,6 @@
   "enableEnvelopes": false,
   "release": 1.5,
   "grainIndex": 3,
-  "grainLength": 500,
   "offset": 0,
   "frameRate": 20,
   "numberOfGrains": 4,
