@@ -26,11 +26,6 @@
     return biquadFilter;
   };
 
-  var biquad$1 = /*#__PURE__*/Object.freeze({
-    default: biquad,
-    __moduleExports: biquad
-  });
-
   var bitcrusher = (config, tuna) => {
     console.log(tuna);
     return new tuna.Bitcrusher({
@@ -40,11 +35,6 @@
     });
   };
 
-  var bitcrusher$1 = /*#__PURE__*/Object.freeze({
-    default: bitcrusher,
-    __moduleExports: bitcrusher
-  });
-
   var chorus = (config, tuna) => {
     return new tuna.Chorus({
       feedback: config.chorus.feedback,
@@ -53,11 +43,6 @@
       rate: config.chorus.rate,
     });
   };
-
-  var chorus$1 = /*#__PURE__*/Object.freeze({
-    default: chorus,
-    __moduleExports: chorus
-  });
 
   var convolver = (config, tuna) => {
     return new tuna.Convolver({
@@ -69,11 +54,6 @@
       impulse: config.convolver.impulse
     });
   };
-
-  var convolver$1 = /*#__PURE__*/Object.freeze({
-    default: convolver,
-    __moduleExports: convolver
-  });
 
   var detune = (config, tuna, bufferSource) => {
     if (config.detune.randomize) {
@@ -91,21 +71,11 @@
     }  return bufferSource;
   };
 
-  var detune$1 = /*#__PURE__*/Object.freeze({
-    default: detune,
-    __moduleExports: detune
-  });
-
   var gain = (config) => {
     const gainNode = offlineAudioCtx.createGain();
     gainNode.gain.value = config.gain.value;
     return gainNode;
   };
-
-  var gain$1 = /*#__PURE__*/Object.freeze({
-    default: gain,
-    __moduleExports: gain
-  });
 
   var phaser = (config, tuna) => { 
     return new tuna.Phaser({
@@ -117,11 +87,6 @@
     });
   };
 
-  var phaser$1 = /*#__PURE__*/Object.freeze({
-    default: phaser,
-    __moduleExports: phaser
-  });
-
   var pingPong = (config, tuna) => { 
     return new tuna.PingPongDelay({
       wetLevel: config.pingPong.wetLevel,
@@ -130,11 +95,6 @@
       delayTimeRight: config.pingPong.delayTimeRight
     });
   };
-
-  var pingPong$1 = /*#__PURE__*/Object.freeze({
-    default: pingPong,
-    __moduleExports: pingPong
-  });
 
   var playbackRate = (config, tuna, bufferSource) => {
     if (config.playbackRate.randomize) {
@@ -150,11 +110,6 @@
     }  return bufferSource;
   };
 
-  var playbackRate$1 = /*#__PURE__*/Object.freeze({
-    default: playbackRate,
-    __moduleExports: playbackRate
-  });
-
   var wahwah = (config, tuna) => {
     /* return new tuna.WahWah({ */
     /*   automode: config.wahwah.automode, */
@@ -165,69 +120,29 @@
     /* }); */
   };
 
-  var wahwah$1 = /*#__PURE__*/Object.freeze({
-    default: wahwah,
-    __moduleExports: wahwah
-  });
-
-  var require$$0 = ( biquad$1 && biquad ) || biquad$1;
-
-  var require$$1 = ( bitcrusher$1 && bitcrusher ) || bitcrusher$1;
-
-  var require$$2 = ( chorus$1 && chorus ) || chorus$1;
-
-  var require$$3 = ( convolver$1 && convolver ) || convolver$1;
-
-  var require$$4 = ( detune$1 && detune ) || detune$1;
-
-  var require$$5 = ( gain$1 && gain ) || gain$1;
-
-  var require$$6 = ( phaser$1 && phaser ) || phaser$1;
-
-  var require$$7 = ( pingPong$1 && pingPong ) || pingPong$1;
-
-  var require$$8 = ( playbackRate$1 && playbackRate ) || playbackRate$1;
-
-  var require$$9 = ( wahwah$1 && wahwah ) || wahwah$1;
-
-  var biquad$2 = require$$0;
-  var bitcrusher$2 = require$$1;
-  var chorus$2 = require$$2;
-  var convolver$2 = require$$3;
-  var detune$2 = require$$4;
-  var gain$2 = require$$5;
-  var phaser$2 = require$$6;
-  var pingPong$2 = require$$7;
-  var playbackRate$2 = require$$8;
-  var wahwah$2 = require$$9;
+  var biquad$1 = biquad;
+  var bitcrusher$1 = bitcrusher;
+  var chorus$1 = chorus;
+  var convolver$1 = convolver;
+  var detune$1 = detune;
+  var gain$1 = gain;
+  var phaser$1 = phaser;
+  var pingPong$1 = pingPong;
+  var playbackRate$1 = playbackRate;
+  var wahwah$1 = wahwah;
 
   var effects = {
-  	biquad: biquad$2,
-  	bitcrusher: bitcrusher$2,
-  	chorus: chorus$2,
-  	convolver: convolver$2,
-  	detune: detune$2,
-  	gain: gain$2,
-  	phaser: phaser$2,
-  	pingPong: pingPong$2,
-  	playbackRate: playbackRate$2,
-  	wahwah: wahwah$2
+  	biquad: biquad$1,
+  	bitcrusher: bitcrusher$1,
+  	chorus: chorus$1,
+  	convolver: convolver$1,
+  	detune: detune$1,
+  	gain: gain$1,
+  	phaser: phaser$1,
+  	pingPong: pingPong$1,
+  	playbackRate: playbackRate$1,
+  	wahwah: wahwah$1
   };
-
-  var effects$1 = /*#__PURE__*/Object.freeze({
-    default: effects,
-    __moduleExports: effects,
-    biquad: biquad$2,
-    bitcrusher: bitcrusher$2,
-    chorus: chorus$2,
-    convolver: convolver$2,
-    detune: detune$2,
-    gain: gain$2,
-    phaser: phaser$2,
-    pingPong: pingPong$2,
-    playbackRate: playbackRate$2,
-    wahwah: wahwah$2
-  });
 
   function createCommonjsModule(fn, module) {
   	return module = { exports: {} }, fn(module, module.exports), module.exports;
@@ -2505,15 +2420,6 @@
   })();
   });
 
-  var tuna$1 = /*#__PURE__*/Object.freeze({
-    default: tuna,
-    __moduleExports: tuna
-  });
-
-  var effects$2 = ( effects$1 && effects ) || effects$1;
-
-  var Tuna = ( tuna$1 && tuna ) || tuna$1;
-
   // Create a Databender instance
   var databender = function (config, audioCtx) {
     this.audioCtx = audioCtx ? audioCtx : new AudioContext();
@@ -2558,7 +2464,7 @@
       // Create offlineAudioCtx that will house our rendered buffer
       var offlineAudioCtx = new OfflineAudioContext(this.channels, buffer.length * this.channels, this.audioCtx.sampleRate);
 
-      var tuna = new Tuna(offlineAudioCtx);
+      var tuna$$1 = new tuna(offlineAudioCtx);
 
       // Create an AudioBufferSourceNode, which represents an audio source consisting of in-memory audio data
       var bufferSource = offlineAudioCtx.createBufferSource();
@@ -2567,7 +2473,7 @@
       bufferSource.buffer = buffer; 
 
       var activeEffects = this.configKeys.reduce((acc, cur) => {
-        this.config[cur].active ? acc[cur] = effects$2[cur] : false; 
+        this.config[cur].active ? acc[cur] = effects[cur] : false; 
         return acc;
       }, {});
       var activeEffectsIndex = Object.keys(activeEffects);
@@ -2577,7 +2483,7 @@
       if (activeEffectsIndex && activeEffectsIndex.length) {
         activeEffectsIndex.forEach((effect) => {
           if (effect === 'detune' || effect === 'playbackRate') {
-            effects$2[effect](this.config, tuna, bufferSource);
+            effects[effect](this.config, tuna$$1, bufferSource);
             activeEffectsIndex.pop();
           }
         });
@@ -2587,8 +2493,8 @@
         bufferSource.connect(offlineAudioCtx.destination);
       } else {
         var nodes = activeEffectsIndex.map((effect) => { 
-          const context = effect === 'biquad' ? offlineAudioCtx : tuna;
-          return effects$2[effect](this.config, context, bufferSource);
+          const context = effect === 'biquad' ? offlineAudioCtx : tuna$$1;
+          return effects[effect](this.config, context, bufferSource);
         }).filter(Boolean);
 
         nodes.forEach((node) => { 
@@ -2640,6 +2546,7 @@
   const enableEnvelopes = false;
   const release = 1.5;
   const grainIndex = 3;
+  const grainLength = 500;
   const offset = 0;
   const frameRate = 20;
   const numberOfGrains = 4;
@@ -2652,6 +2559,7 @@
   	enableEnvelopes: enableEnvelopes,
   	release: release,
   	grainIndex: grainIndex,
+  	grainLength: grainLength,
   	offset: offset,
   	frameRate: frameRate,
   	numberOfGrains: numberOfGrains,
@@ -5759,6 +5667,7 @@
     },
     GUI: GUI
   };
+  //# sourceMappingURL=dat.gui.module.js.map
 
   function handleDatGUI(databender$$1, audioGranularSynth, videoGranularSynth){
     const gui = new index.GUI();
@@ -5853,7 +5762,7 @@
     }
   }
   function loadTrack () {
-    fetch('audience.mp3')
+    fetch('sample5.m4a')
       .then((response) => response.arrayBuffer())
       .then((buffer) => {
         window.trackBuffer = buffer;
@@ -5863,6 +5772,7 @@
   }
   function main () {
     loadTrack();
+    var AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioCtx = new AudioContext();
     const renderCanvas = document.querySelector('#canvas');
     const upload = document.querySelector('.upload');
@@ -5881,13 +5791,18 @@
       audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
         audioGranularSynth.createGrains(buffer);
 
+        let bufferSource;
+
         const audioTriggerCallback = (originalBuffer, gainNode) => {
           databender$$1.render(originalBuffer)
             .then((buffer) => {
-                const bufferSource = audioCtx.createBufferSource();
+                bufferSource = audioCtx.createBufferSource();
                 bufferSource.buffer = buffer;
                 bufferSource.loop = config.loopAudio;
                 bufferSource.connect(audioCtx.destination);
+                setTimeout(function () { 
+                  bufferSource.stop(0);
+                }, config.grainLength);
               if (config.playAudio) {
                 bufferSource.start(0);
               }
@@ -5942,6 +5857,7 @@
       });
     };
   }
+  window.OfflineAudioContext = window.OfflineAudioContext || webkitOfflineAudioContext;
   main();
 
 }());

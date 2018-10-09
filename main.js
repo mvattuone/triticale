@@ -100,7 +100,7 @@ function handleFileUpload(file, renderCanvas, databender, videoGranularSynth) {
 };
 
 function loadTrack () {
-  fetch('audience.mp3')
+  fetch('sample5.m4a')
     .then((response) => response.arrayBuffer())
     .then((buffer) => {
       window.trackBuffer = buffer;
@@ -111,6 +111,7 @@ function loadTrack () {
 
 function main () {
   loadTrack();
+  var AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioCtx = new AudioContext();
   const renderCanvas = document.querySelector('#canvas');
   const upload = document.querySelector('.upload');
@@ -129,13 +130,18 @@ function main () {
     audioCtx.decodeAudioData(window.trackBuffer, function (buffer) {
       audioGranularSynth.createGrains(buffer);
 
+      let bufferSource;
+
       const audioTriggerCallback = (originalBuffer, gainNode) => {
         databender.render(originalBuffer)
           .then((buffer) => {
-              const bufferSource = audioCtx.createBufferSource();
+              bufferSource = audioCtx.createBufferSource();
               bufferSource.buffer = buffer;
               bufferSource.loop = config.loopAudio;
               bufferSource.connect(audioCtx.destination);
+              setTimeout(function () { 
+                bufferSource.stop(0);
+              }, config.grainLength);
             if (config.playAudio) {
               bufferSource.start(0);
             }
@@ -191,4 +197,5 @@ function main () {
   }
 };
 
+window.OfflineAudioContext = window.OfflineAudioContext || webkitOfflineAudioContext;
 main();
