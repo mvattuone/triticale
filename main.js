@@ -68,7 +68,20 @@ function handleVideoUpload(file, renderCanvas, databender, videoGranularSynth){
   reader.readAsDataURL(file);
 }
 
+function handleAudioUpload(file, audioCtx, audioGranularSynth) {
+  var audioFileReader = new FileReader();
+  audioFileReader.onload = () => {
+    audioCtx.decodeAudioData(audioFileReader.result, function (buffer) {
+      audioGranularSynth.createGrains(buffer);
+    });
+  };
+
+  audioFileReader.readAsArrayBuffer(file);
+}
+
+
 function getFileType(file) {
+  const audioFileTypes = ['m4a', 'mp3'];
   const imageFileTypes = ['jpg', 'png', 'bmp', 'jpeg'];
   const videoFileTypes = ['mp4', 'webm'];
   const fileExtension = file.name.split('.')[1];
@@ -76,8 +89,10 @@ function getFileType(file) {
 
   if (imageFileTypes.includes(fileExtension)) { 
     fileType = 'image';
-  } else if (videoFileTypes.indexOf(fileExtension) >= 0) {
+  } else if (videoFileTypes.includes(fileExtension)) {
     fileType = 'video';
+  } else if (audioFileTypes.includes(fileExtension)) {
+    fileType = 'audio';
   } else {
     return null;
   }
@@ -86,13 +101,15 @@ function getFileType(file) {
 };
 
 
-function handleFileUpload(file, renderCanvas, databender, videoGranularSynth) {
+function handleFileUpload(file, renderCanvas, databender, videoGranularSynth, audioGranularSynth, audioCtx) {
   const type = getFileType(file);
   switch (type) { 
     case 'image': 
       return handleImageUpload(file, renderCanvas, databender, videoGranularSynth);
     case 'video':
       return handleVideoUpload(file, renderCanvas, databender, videoGranularSynth);
+    case 'audio':
+      return handleAudioUpload(file, audioCtx, audioGranularSynth);
     default:
       alert('File Type is not supported');
       return false;
@@ -100,100 +117,80 @@ function handleFileUpload(file, renderCanvas, databender, videoGranularSynth) {
 };
 
 function main () {
-  var AudioContext = window.AudioContext || window.webkitAudioContext;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioCtx = new AudioContext();
   const renderCanvas = document.querySelector('#canvas');
   const dropzone = document.querySelector('.dropzone');
+  const button = document.querySelector('button');
   const upload = document.querySelector('#imageUpload');
   const audioUpload = document.querySelector('#audioUpload');
-  let audioData;
-  audioUpload.onchange = function(){
-    var files = this.files;
-    var audioFileReader = new FileReader();
-    audioFileReader.onload = () => {
-      audioData = audioFileReader.result;
-    }
-    audioFileReader.readAsArrayBuffer(files[0]);
-  };
+  const databender = new Databender(config, audioCtx);
+  const audioGranularSynth = new GranularSynth(audioCtx, config); 
+  const videoGranularSynth = new GranularSynth(audioCtx, config); 
+  handleDatGUI(databender, audioGranularSynth, videoGranularSynth);
   dropzone.ondragover = function () { this.classList.add('hover'); return false; };
   dropzone.ondragend = function () { this.classList.remove('hover'); return false; };
   dropzone.ondrop = function (e) {
     e.preventDefault();
-    const databender = new Databender(config, audioCtx);
-    const audioGranularSynth = new GranularSynth(audioCtx, config); 
-    const videoGranularSynth = new GranularSynth(audioCtx, config); 
-    handleDatGUI(databender, audioGranularSynth, videoGranularSynth);
-    document.querySelector('.dropzone').style.display = 'none';
-    document.querySelector('#audioUpload').style.display = 'none';
-    document.querySelector('#imageUpload').style.display = 'none';
     const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
-    handleFileUpload(files[0], renderCanvas, databender, videoGranularSynth);
-    audioCtx.decodeAudioData(audioData, function (buffer) {
-      audioGranularSynth.createGrains(buffer);
+    handleFileUpload(files[0], renderCanvas, databender, videoGranularSynth, audioGranularSynth, audioCtx);
+  }
 
-      let bufferSource;
+  button.onclick = (e) => {
 
-      const audioTriggerCallback = (originalBuffer, gainNode) => {
-        databender.render(originalBuffer)
-          .then((buffer) => {
-            if (bufferSource) bufferSource.stop();
-            bufferSource = audioCtx.createBufferSource();
-            bufferSource.buffer = buffer;
-            bufferSource.loop = config.loopAudio;
-            bufferSource.connect(audioCtx.destination);
-            if (config.playAudio) {
-              bufferSource.start(0);
-            }
-          });
+    if (!audioGranularSynth.grains || !videoGranularSynth.grains) {
+      alert('please add a video and an audio');
+      return false;
+    }
+
+    // We need to validate that there is an image and audio data available
+    let bufferSource;
+
+    document.querySelector('.dropzone').style.display = 'none';
+    const audioTriggerCallback = (originalBuffer, gainNode) => {
+      databender.render(originalBuffer)
+        .then((buffer) => {
+          if (bufferSource) bufferSource.stop();
+          bufferSource = audioCtx.createBufferSource();
+          bufferSource.buffer = buffer;
+          bufferSource.loop = config.loopAudio;
+          bufferSource.connect(audioCtx.destination);
+          if (config.playAudio) {
+            bufferSource.start(0);
+          }
+        });
+    }
+
+    const videoTriggerCallback = (originalBuffer) => {
+      databender.render(originalBuffer)
+        .then((buffer) => databender.draw(buffer, renderCanvas.getContext('2d'), 0, 0, 0, 0, databender.imageData.width, databender.imageData.height/config.numberOfGrains))
+    }
+
+    document.addEventListener('keypress', (e) => {
+      var keyboard = '`qwertyuiopasdfghjklzxcvbnm';
+
+      if (e.code === 'Backslash') {
+        audioGranularSynth.stop();
+        videoGranularSynth.stop();
       }
 
-      const videoTriggerCallback = (originalBuffer) => {
-        databender.render(originalBuffer)
-          .then((buffer) => databender.draw(buffer, renderCanvas.getContext('2d'), 0, 0, 0, 0, databender.imageData.width, databender.imageData.height/config.numberOfGrains))
-      }
+      // Key codes are kind of inflexible if you're using a shift+key
+      if (e.code === 'Equal') config.numberOfGrains > 0 ? config.numberOfGrains += 5 : 0;
+      if (e.key === '-') config.numberOfGrains > 0 ? config.numberOfGrains -= 5 : 0;
 
-      document.addEventListener('keypress', (e) => {
-        if (e.code === 'Enter') {
-          audioGranularSynth.play(audioTriggerCallback);
-          videoGranularSynth.play(videoTriggerCallback);
-        }
-        if (e.code === 'Backslash') {
-          audioGranularSynth.stop();
-          videoGranularSynth.stop();
-        }
-        if (e.code === 'KeyP') {
-          config.grainIndex = 32;          
-        }
-        if (e.code === 'KeyO') {
-          config.grainIndex = 27;          
-        }
-        if (e.code === 'KeyI') {
-          config.grainIndex = 21;          
-        }
-        if (e.code === 'KeyU') {
-          config.grainIndex = 18;          
-        }
-        if (e.code === 'KeyY') {
-          config.grainIndex = 5;          
-        }
-        if (e.code === 'KeyT') {
-          config.grainIndex = 11;          
-        }
-        if (e.code === 'KeyR') {
-          config.grainIndex = 9;          
-        }
-        if (e.code === 'KeyE') {
-          config.grainIndex = 25;          
-        }
-        if (e.code === 'KeyW') {
-          config.grainIndex = 29;          
-        }
-        if (e.code === 'KeyQ') {
-          config.grainIndex = 1;          
+      keyboard.toUpperCase().split('').forEach((letter, index) => {
+        if (e.code === `Key${letter}`) {
+          config.grainIndex = index + 1;          
         }
       });
+
+      audioGranularSynth.updateValues(config);
+      videoGranularSynth.updateValues(config);
     });
-  }
+    
+    audioGranularSynth.play(audioTriggerCallback);
+    videoGranularSynth.play(videoTriggerCallback);
+  };
 };
 
 window.OfflineAudioContext = window.OfflineAudioContext || webkitOfflineAudioContext;
