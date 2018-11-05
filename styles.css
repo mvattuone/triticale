@@ -3,11 +3,13 @@ body {
 }
 
 .dropzone {
+  align-items: center;
   border: 1px solid #000;
+  display: flex;
+  justify-content: center;
   margin: 0 auto;
   width:500px;
   height:500px;
-  text-align: center;
 }
 
 .dropzone.hover {

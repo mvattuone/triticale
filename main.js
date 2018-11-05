@@ -80,18 +80,17 @@ function handleAudioUpload(file, audioCtx, audioGranularSynth) {
 }
 
 
-function getFileType(file) {
-  const audioFileTypes = ['m4a', 'mp3'];
+function getFileType(extension) {
+  const audioFileTypes = ['m4a', 'x-m4a', 'mp3'];
   const imageFileTypes = ['jpg', 'png', 'bmp', 'jpeg'];
   const videoFileTypes = ['mp4', 'webm'];
-  const fileExtension = file.name.split('.')[1];
   let fileType;
 
-  if (imageFileTypes.includes(fileExtension)) { 
+  if (imageFileTypes.includes(extension)) {
     fileType = 'image';
-  } else if (videoFileTypes.includes(fileExtension)) {
+  } else if (videoFileTypes.includes(extension)) {
     fileType = 'video';
-  } else if (audioFileTypes.includes(fileExtension)) {
+  } else if (audioFileTypes.includes(extension)) {
     fileType = 'audio';
   } else {
     return null;
@@ -102,7 +101,7 @@ function getFileType(file) {
 
 
 function handleFileUpload(file, renderCanvas, databender, videoGranularSynth, audioGranularSynth, audioCtx) {
-  const type = getFileType(file);
+  const type = getFileType(file.name.split('.')[1]);
   switch (type) { 
     case 'image': 
       return handleImageUpload(file, renderCanvas, databender, videoGranularSynth);
@@ -116,6 +115,23 @@ function handleFileUpload(file, renderCanvas, databender, videoGranularSynth, au
   }
 };
 
+function handleDragOver(e) {
+  e.preventDefault();
+  const fileType = e.dataTransfer.items[0].type.split('/')[0];
+  this.innerHTML = `Upload ${fileType}`;
+  this.classList.add('hover');
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  this.innerHTML = 'Drop file here to upload';
+  this.classList.remove('hover');
+}
+
+function handleDragEnd(e) {
+  e.preventDefault();
+}
+
 function main () {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const audioCtx = new AudioContext();
@@ -128,8 +144,9 @@ function main () {
   const audioGranularSynth = new GranularSynth(audioCtx, config); 
   const videoGranularSynth = new GranularSynth(audioCtx, config); 
   handleDatGUI(databender, audioGranularSynth, videoGranularSynth);
-  dropzone.ondragover = function () { this.classList.add('hover'); return false; };
-  dropzone.ondragend = function () { this.classList.remove('hover'); return false; };
+  dropzone.ondragover = handleDragOver;
+  dropzone.ondragleave = handleDragLeave;
+  dropzone.ondragend = handleDragEnd;
   dropzone.ondrop = function (e) {
     e.preventDefault();
     const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
@@ -139,11 +156,14 @@ function main () {
   button.onclick = (e) => {
 
     if (!audioGranularSynth.grains || !videoGranularSynth.grains) {
-      alert('please add a video and an audio');
+      alert('You need to upload video and audio before you can granulate');
       return false;
+    } else if (!audioGranularSynth.grains) { 
+      alert('You need to upload audio before you can granulate');
+    } else if (!videoGranularSynth.grains) { 
+      alert('You need to upload image or video before you can granulate');
     }
 
-    // We need to validate that there is an image and audio data available
     let bufferSource;
 
     document.querySelector('.dropzone').style.display = 'none';
