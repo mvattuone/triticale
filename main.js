@@ -3,7 +3,7 @@ import config from './config.json';
 import GranularSynth from './granular';
 import dat from 'dat.gui';
 
-function handleDatGUI(databender, audioGranularSynth, videoGranularSynth){
+function handleDatGUI(audioGranularSynth, videoGranularSynth){
   const gui = new dat.GUI();
   Object.keys(config).forEach(function (param) {
     gui.add(config, param, 0, 2000, 1)
@@ -138,12 +138,10 @@ function main () {
   const renderCanvas = document.querySelector('#canvas');
   const dropzone = document.querySelector('.dropzone');
   const button = document.querySelector('button');
-  const upload = document.querySelector('#imageUpload');
-  const audioUpload = document.querySelector('#audioUpload');
   const databender = new Databender(config, audioCtx);
   const audioGranularSynth = new GranularSynth(audioCtx, config); 
   const videoGranularSynth = new GranularSynth(audioCtx, config); 
-  handleDatGUI(databender, audioGranularSynth, videoGranularSynth);
+  handleDatGUI(audioGranularSynth, videoGranularSynth);
   dropzone.ondragover = handleDragOver;
   dropzone.ondragleave = handleDragLeave;
   dropzone.ondragend = handleDragEnd;
