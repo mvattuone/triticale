@@ -2,14 +2,20 @@ body {
   margin: 0;
 }
 
+.container {
+  display: grid;
+  grid-template-columns: repeat(4, fit-content(25%));
+  grid-template-rows: auto;
+}
+
+.granular-synth,
+.granular-synth-2 {
+  overflow: hidden;
+}
+
 .dropzone {
-  align-items: center;
   border: 1px solid #000;
-  display: flex;
-  justify-content: center;
-  margin: 0 auto;
-  width:500px;
-  height:500px;
+  height: 500px;
 }
 
 .dropzone.hover {

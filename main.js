@@ -3,8 +3,8 @@ import config from './config.json';
 import GranularSynth from './granular';
 import dat from 'dat.gui';
 
-function handleDatGUI(audioGranularSynth, videoGranularSynth){
-  const gui = new dat.GUI();
+function handleDatGUI(audioGranularSynth, videoGranularSynth, config, name){
+  const gui = new dat.GUI({ name });
   Object.keys(config).forEach(function (param) {
     gui.add(config, param, 0, 2000, 1)
       .listen()
@@ -16,7 +16,7 @@ function handleDatGUI(audioGranularSynth, videoGranularSynth){
   });
 };
 
-function renderVideoToCanvas(v, renderCanvas, databender, videoGranularSynth) {
+function renderVideoToCanvas(v, renderCanvas, databender, videoGranularSynth, config) {
   let timer;
   let time;
 
@@ -35,7 +35,7 @@ function renderVideoToCanvas(v, renderCanvas, databender, videoGranularSynth) {
   }());
 }
 
-function handleImageUpload (file, renderCanvas, databender, videoGranularSynth) {
+function handleImageUpload (file, renderCanvas, databender, videoGranularSynth, config) {
   const reader = new FileReader();
   reader.onload = function (e) {
     const img = new Image();
@@ -68,10 +68,10 @@ function handleVideoUpload(file, renderCanvas, databender, videoGranularSynth){
   reader.readAsDataURL(file);
 }
 
-function handleAudioUpload(file, audioCtx, audioGranularSynth) {
+function handleAudioUpload(file, audioContext, audioGranularSynth) {
   var audioFileReader = new FileReader();
   audioFileReader.onload = () => {
-    audioCtx.decodeAudioData(audioFileReader.result, function (buffer) {
+    audioContext.decodeAudioData(audioFileReader.result, function (buffer) {
       audioGranularSynth.createGrains(buffer);
     });
   };
@@ -81,7 +81,7 @@ function handleAudioUpload(file, audioCtx, audioGranularSynth) {
 
 
 function getFileType(extension) {
-  const audioFileTypes = ['m4a', 'x-m4a', 'mp3'];
+  const audioFileTypes = ['m4a', 'x-m4a', 'mp3', 'WAV'];
   const imageFileTypes = ['jpg', 'png', 'bmp', 'jpeg'];
   const videoFileTypes = ['mp4', 'webm'];
   let fileType;
@@ -100,7 +100,7 @@ function getFileType(extension) {
 };
 
 
-function handleFileUpload(file, renderCanvas, databender, videoGranularSynth, audioGranularSynth, audioCtx) {
+function handleFileUpload(file, renderCanvas, databender, videoGranularSynth, audioGranularSynth, audioContext) {
   const type = getFileType(file.name.split('.')[1]);
   switch (type) { 
     case 'image': 
@@ -108,7 +108,7 @@ function handleFileUpload(file, renderCanvas, databender, videoGranularSynth, au
     case 'video':
       return handleVideoUpload(file, renderCanvas, databender, videoGranularSynth);
     case 'audio':
-      return handleAudioUpload(file, audioCtx, audioGranularSynth);
+      return handleAudioUpload(file, audioContext, audioGranularSynth);
     default:
       alert('File Type is not supported');
       return false;
@@ -132,23 +132,22 @@ function handleDragEnd(e) {
   e.preventDefault();
 }
 
-function main () {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  const audioCtx = new AudioContext();
-  const renderCanvas = document.querySelector('#canvas');
-  const dropzone = document.querySelector('.dropzone');
-  const button = document.querySelector('button');
-  const databender = new Databender(config, audioCtx);
-  const audioGranularSynth = new GranularSynth(audioCtx, config); 
-  const videoGranularSynth = new GranularSynth(audioCtx, config); 
-  handleDatGUI(audioGranularSynth, videoGranularSynth);
+function createGranularSynth(name, audioContext, config) {
+  const container = document.querySelector(`.${name}`);
+  const renderCanvas = container.querySelector('canvas');
+  const dropzone = document.querySelector(`.${name} .dropzone`);
+  const button = container.querySelector('button');
+  const databender = new Databender(config, audioContext);
+  const audioGranularSynth = new GranularSynth(audioContext, config); 
+  const videoGranularSynth = new GranularSynth(audioContext, config); 
+  handleDatGUI(audioGranularSynth, videoGranularSynth, config, name);
   dropzone.ondragover = handleDragOver;
   dropzone.ondragleave = handleDragLeave;
   dropzone.ondragend = handleDragEnd;
   dropzone.ondrop = function (e) {
     e.preventDefault();
     const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
-    handleFileUpload(files[0], renderCanvas, databender, videoGranularSynth, audioGranularSynth, audioCtx);
+    handleFileUpload(files[0], renderCanvas, databender, videoGranularSynth, audioGranularSynth, audioContext);
   }
 
   button.onclick = (e) => {
@@ -164,27 +163,27 @@ function main () {
 
     let bufferSource;
 
-    document.querySelector('.dropzone').style.display = 'none';
+    container.querySelector('.dropzone').style.display = 'none';
     const audioTriggerCallback = (originalBuffer, gainNode) => {
       databender.render(originalBuffer)
         .then((buffer) => {
           if (bufferSource) bufferSource.stop();
-          bufferSource = audioCtx.createBufferSource();
+          bufferSource = audioContext.createBufferSource();
           bufferSource.buffer = buffer;
           bufferSource.loop = config.loopAudio;
-          bufferSource.connect(audioCtx.destination);
+          bufferSource.connect(audioContext.destination);
           if (config.playAudio) {
             bufferSource.start(0);
           }
         });
     }
 
-    const videoTriggerCallback = (originalBuffer) => {
+    const videoTriggerCallback = (originalBuffer, config) => {
       databender.render(originalBuffer)
         .then((buffer) => databender.draw(buffer, renderCanvas.getContext('2d'), 0, 0, 0, 0, databender.imageData.width, databender.imageData.height/config.numberOfGrains))
     }
 
-    document.addEventListener('keypress', (e) => {
+    container.addEventListener('keypress', (e) => {
       var keyboard = '`qwertyuiopasdfghjklzxcvbnm';
 
       if (e.code === 'Backslash') {
@@ -202,14 +201,24 @@ function main () {
         }
       });
 
-      audioGranularSynth.updateValues(config);
-      videoGranularSynth.updateValues(config);
+      audioGranularSynth.updateValues(audioGranularSynth.config);
+      videoGranularSynth.updateValues(videoGranularSynth.config);
     });
     
-    audioGranularSynth.play(audioTriggerCallback);
-    videoGranularSynth.play(videoTriggerCallback);
+    audioGranularSynth.play(audioTriggerCallback, audioGranularSynth.config);
+    videoGranularSynth.play(videoTriggerCallback, videoGranularSynth.config);
   };
+
+}
+
+function main () {
+  window.OfflineAudioContext = window.OfflineAudioContext || webkitOfflineAudioContext;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioContext = new AudioContext();
+  const g1Config = JSON.parse(JSON.stringify(config)); 
+  const g2Config = JSON.parse(JSON.stringify(config)); 
+  createGranularSynth('granular-synth', audioContext, g1Config);
+  createGranularSynth('granular-synth-2', audioContext, g2Config);
 };
 
-window.OfflineAudioContext = window.OfflineAudioContext || webkitOfflineAudioContext;
 main();
