@@ -1,11 +1,7 @@
 {
   "loopAudio": false,
   "loopVideo": false,
-  "attack": 0.4,
-  "enableEnvelopes": false,
-  "release": 1.5,
   "grainIndex": 3,
-  "offset": 0,
   "frameRate": 20,
   "numberOfGrains": 4,
   "walkProbability": 1,

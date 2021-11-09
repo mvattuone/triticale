@@ -2542,11 +2542,7 @@
 
   const loopAudio = false;
   const loopVideo = false;
-  const attack = 0.4;
-  const enableEnvelopes = false;
-  const release = 1.5;
   const grainIndex = 3;
-  const offset = 0;
   const frameRate = 20;
   const numberOfGrains = 4;
   const walkProbability = 1;
@@ -2554,11 +2550,7 @@
   var config = {
   	loopAudio: loopAudio,
   	loopVideo: loopVideo,
-  	attack: attack,
-  	enableEnvelopes: enableEnvelopes,
-  	release: release,
   	grainIndex: grainIndex,
-  	offset: offset,
   	frameRate: frameRate,
   	numberOfGrains: numberOfGrains,
   	walkProbability: walkProbability,
@@ -3042,7 +3034,6 @@
   var lodash_chunk = chunk;
 
   class Grain {
-
     constructor(context, data, output, config, isVideo) {
       this.config = config;
       this.context = context;
@@ -3061,18 +3052,21 @@
       for (let i = 0; i < N; i++) {
         // Hann window, useful for removing clipping sounds from start/stop of grains.
         // But don't do for image/video since it removes visuals we want
-        const window_fn = isVideo ? 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1))) : 1;
+        const window_fn = isVideo
+          ? 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)))
+          : 1;
         buffer_data[i] = this.data[i] * window_fn;
       }
 
       this.gainNode = this.context.createGain();
       this.gainNode.connect(this.output);
-    };
+    }
 
     trigger(callback) {
-      callback(this.buffer, this.gainNode);
-    };
+      callback(this.buffer, this.config);
+    }
   }
+
   class GranularSynth {
     constructor(context, config) {
       this.context = context;
@@ -3088,30 +3082,36 @@
       const grainSize = Math.floor(buffer.length / this.config.numberOfGrains);
       const chunks = lodash_chunk(rawData, grainSize);
       this.buffer = buffer;
-      this.grains = chunks.map(function(data) {
-        return new Grain(this.context, data, this.output, this.config)
-      }.bind(this));
+      this.grains = chunks.map(
+        function (data) {
+          return new Grain(this.context, data, this.output, this.config);
+        }.bind(this)
+      );
     }
 
     updateGrains() {
-      const grainSize = Math.floor(this.buffer.length / this.config.numberOfGrains);
+      const grainSize = Math.floor(
+        this.buffer.length / this.config.numberOfGrains
+      );
       const rawData = this.buffer.getChannelData(0);
       const chunks = lodash_chunk(rawData, grainSize);
-      this.grains = chunks.map(function(data) {
-        return new Grain(this.context, data, this.output, this.config)
-      }.bind(this));
+      this.grains = chunks.map(
+        function (data) {
+          return new Grain(this.context, data, this.output, this.config);
+        }.bind(this)
+      );
     }
 
-    updateValues(config) { 
+    updateValues(config) {
       this.config = config;
       this.updateGrains();
-    };
+    }
 
-    stop() { 
+    stop() {
       cancelAnimationFrame(this.scheduler);
       this.stopLoop = true;
       return;
-    };
+    }
 
     play(callback) {
       this.stopLoop = false;
@@ -3120,13 +3120,15 @@
       let then = Date.now();
       let delta;
 
-      const triggerGrain = function() {
+      const triggerGrain = function () {
         if (!this.stopLoop) {
           requestAnimationFrame(triggerGrain.bind(this));
         }
 
         let grainIndex = this.config.grainIndex;
-        const interval = (this.grains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
+        const interval =
+          (this.grains[grainIndex].buffer.duration * 1000) /
+          this.config.frameRate;
         now = Date.now();
         delta = now - then;
 
@@ -3142,6 +3144,10 @@
             }
           }
 
+          if (grainIndex < 0) {
+            return triggerGrain.call(this);
+          }
+
           this.grains[grainIndex].trigger(callback);
 
           then = now - (delta % interval);
@@ -3151,7 +3157,7 @@
       this.scheduler = requestAnimationFrame(() => {
         triggerGrain.call(this);
       });
-    };
+    }
   }
 
   /**
@@ -5667,58 +5673,76 @@
   };
   //# sourceMappingURL=dat.gui.module.js.map
 
-  function handleDatGUI(audioGranularSynth, videoGranularSynth, config$$1, name){
-    const gui = new index.GUI({ name });
+  function handleDatGUI(audioGranularSynth, videoGranularSynth, config$$1, name) {
+    const gui = new index.GUI({
+      name,
+    });
     Object.keys(config$$1).forEach(function (param) {
-      gui.add(config$$1, param, 0, 2000, 1)
+      gui
+        .add(config$$1, param, 0, 2000, 1)
         .listen()
-        .onFinishChange(function (value) { 
+        .onFinishChange(function (value) {
           config$$1[param] = value;
           audioGranularSynth.updateValues(config$$1);
           videoGranularSynth.updateValues(config$$1);
         });
     });
   }
-  function renderVideoToCanvas(v, renderCanvas, databender$$1, videoGranularSynth, config$$1) {
+
+  function renderVideoToCanvas(
+    v,
+    renderCanvas,
+    databender$$1,
+    videoGranularSynth,
+    config$$1
+  ) {
     let timer;
     let time;
 
     function drawFrame() {
-      if(v.paused || v.ended) return false;
-      databender$$1.convert(v)
-        .then((buffer) => {
-          videoGranularSynth.createGrains(buffer);
-        });
+      if (v.paused || v.ended) return false;
+      databender$$1.convert(v).then((buffer) => {
+        videoGranularSynth.createGrains(buffer);
+      });
     }
 
     (function repeat() {
-      time = 1000 / config$$1.frameRate;  
+      time = 1000 / config$$1.frameRate;
       drawFrame(v, renderCanvas);
       timer = setTimeout(repeat, time);
-    }());
+    })();
   }
 
-  function handleImageUpload (file, renderCanvas, databender$$1, videoGranularSynth, config$$1) {
+  function handleImageUpload(
+    file,
+    renderCanvas,
+    databender$$1,
+    videoGranularSynth,
+    config$$1
+  ) {
     const reader = new FileReader();
     reader.onload = function (e) {
       const img = new Image();
       img.onload = function () {
-        databender$$1.convert(img)
-          .then((buffer) => {
-            videoGranularSynth.createGrains(buffer);
-          });
+        databender$$1.convert(img).then((buffer) => {
+          videoGranularSynth.createGrains(buffer);
+        });
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   }
-  function handleVideoUpload(file, renderCanvas, databender$$1, videoGranularSynth){
-    const reader = new FileReader();
-    const video = document.createElement('video');
 
-    video.addEventListener('play', () =>
-      renderVideoToCanvas(video, renderCanvas, databender$$1, videoGranularSynth)
-    , false);
+  function handleVideoUpload(file, renderCanvas, databender$$1, videoGranularSynth) {
+    const reader = new FileReader();
+    const video = document.createElement("video");
+
+    video.addEventListener(
+      "play",
+      () =>
+        renderVideoToCanvas(video, renderCanvas, databender$$1, videoGranularSynth),
+      false
+    );
 
     reader.onload = function (event) {
       video.src = this.result;
@@ -5741,19 +5765,18 @@
     audioFileReader.readAsArrayBuffer(file);
   }
 
-
   function getFileType(extension) {
-    const audioFileTypes = ['m4a', 'x-m4a', 'mp3', 'WAV'];
-    const imageFileTypes = ['jpg', 'png', 'bmp', 'jpeg'];
-    const videoFileTypes = ['mp4', 'webm'];
+    const audioFileTypes = ["m4a", "x-m4a", "mp3", "WAV"];
+    const imageFileTypes = ["jpg", "png", "bmp", "jpeg"];
+    const videoFileTypes = ["mp4", "webm"];
     let fileType;
 
     if (imageFileTypes.includes(extension)) {
-      fileType = 'image';
+      fileType = "image";
     } else if (videoFileTypes.includes(extension)) {
-      fileType = 'video';
+      fileType = "video";
     } else if (audioFileTypes.includes(extension)) {
-      fileType = 'audio';
+      fileType = "audio";
     } else {
       return null;
     }
@@ -5761,31 +5784,49 @@
     return fileType;
   }
 
-  function handleFileUpload(file, renderCanvas, databender$$1, videoGranularSynth, audioGranularSynth, audioContext) {
-    const type = getFileType(file.name.split('.')[1]);
-    switch (type) { 
-      case 'image': 
-        return handleImageUpload(file, renderCanvas, databender$$1, videoGranularSynth);
-      case 'video':
-        return handleVideoUpload(file, renderCanvas, databender$$1, videoGranularSynth);
-      case 'audio':
+  function handleFileUpload(
+    file,
+    renderCanvas,
+    databender$$1,
+    videoGranularSynth,
+    audioGranularSynth,
+    audioContext
+  ) {
+    const type = getFileType(file.name.split(".")[1]);
+    switch (type) {
+      case "image":
+        return handleImageUpload(
+          file,
+          renderCanvas,
+          databender$$1,
+          videoGranularSynth
+        );
+      case "video":
+        return handleVideoUpload(
+          file,
+          renderCanvas,
+          databender$$1,
+          videoGranularSynth
+        );
+      case "audio":
         return handleAudioUpload(file, audioContext, audioGranularSynth);
       default:
-        alert('File Type is not supported');
+        alert("File Type is not supported");
         return false;
     }
   }
+
   function handleDragOver(e) {
     e.preventDefault();
-    const fileType = e.dataTransfer.items[0].type.split('/')[0];
+    const fileType = e.dataTransfer.items[0].type.split("/")[0];
     this.innerHTML = `Upload ${fileType}`;
-    this.classList.add('hover');
+    this.classList.add("hover");
   }
 
   function handleDragLeave(e) {
     e.preventDefault();
-    this.innerHTML = 'Drop file here to upload';
-    this.classList.remove('hover');
+    this.innerHTML = "Drop file here to upload";
+    this.classList.remove("hover");
   }
 
   function handleDragEnd(e) {
@@ -5793,13 +5834,28 @@
   }
 
   function createGranularSynth(name, audioContext, config$$1) {
+    config$$1 = Object.assign({}, config$$1);
+    const synthMarkup = `
+    <div class="granular-synth ${name}">
+      <div class="dropzone">
+        <p>Drop file here to upload</p>
+      </div>
+      <button>Make something cool</button>
+      <canvas id="${name}-canvas"></canvas>
+    </div>
+  `;
+
+    const body = document.querySelector(".container");
+
+    body.insertAdjacentHTML("beforeend", synthMarkup);
+
     const container = document.querySelector(`.${name}`);
-    const renderCanvas = container.querySelector('canvas');
+    const renderCanvas = container.querySelector("canvas");
     const dropzone = document.querySelector(`.${name} .dropzone`);
-    const button = container.querySelector('button');
+    const button = container.querySelector("button");
     const databender$$1 = new databender(config$$1, audioContext);
-    const audioGranularSynth = new GranularSynth(audioContext, config$$1); 
-    const videoGranularSynth = new GranularSynth(audioContext, config$$1); 
+    const audioGranularSynth = new GranularSynth(audioContext, config$$1);
+    const videoGranularSynth = new GranularSynth(audioContext, config$$1);
     handleDatGUI(audioGranularSynth, videoGranularSynth, config$$1, name);
     dropzone.ondragover = handleDragOver;
     dropzone.ondragleave = handleDragLeave;
@@ -5807,79 +5863,113 @@
     dropzone.ondrop = function (e) {
       e.preventDefault();
       const files = e.target.files || (e.dataTransfer && e.dataTransfer.files);
-      handleFileUpload(files[0], renderCanvas, databender$$1, videoGranularSynth, audioGranularSynth, audioContext);
+      handleFileUpload(
+        files[0],
+        renderCanvas,
+        databender$$1,
+        videoGranularSynth,
+        audioGranularSynth,
+        audioContext
+      );
     };
 
     button.onclick = (e) => {
-
       if (!audioGranularSynth.grains || !videoGranularSynth.grains) {
-        alert('You need to upload video and audio before you can granulate');
+        alert("You need to upload video and audio before you can granulate");
         return false;
-      } else if (!audioGranularSynth.grains) { 
-        alert('You need to upload audio before you can granulate');
-      } else if (!videoGranularSynth.grains) { 
-        alert('You need to upload image or video before you can granulate');
+      } else if (!audioGranularSynth.grains) {
+        alert("You need to upload audio before you can granulate");
+      } else if (!videoGranularSynth.grains) {
+        alert("You need to upload image or video before you can granulate");
       }
 
       let bufferSource;
 
-      container.querySelector('.dropzone').style.display = 'none';
+      container.querySelector(".dropzone").style.display = "none";
       const audioTriggerCallback = (originalBuffer, gainNode) => {
-        databender$$1.render(originalBuffer)
-          .then((buffer) => {
-            if (bufferSource) bufferSource.stop();
-            bufferSource = audioContext.createBufferSource();
-            bufferSource.buffer = buffer;
-            bufferSource.loop = config$$1.loopAudio;
-            bufferSource.connect(audioContext.destination);
-            if (config$$1.playAudio) {
-              bufferSource.start(0);
-            }
-          });
+        databender$$1.render(originalBuffer).then((buffer) => {
+          if (bufferSource) bufferSource.stop();
+          bufferSource = audioContext.createBufferSource();
+          bufferSource.buffer = buffer;
+          bufferSource.loop = config$$1.loopAudio;
+          bufferSource.connect(audioContext.destination);
+          if (config$$1.playAudio) {
+            bufferSource.start(0);
+          }
+        });
       };
 
       const videoTriggerCallback = (originalBuffer, config$$1) => {
-        databender$$1.render(originalBuffer)
-          .then((buffer) => databender$$1.draw(buffer, renderCanvas.getContext('2d'), 0, 0, 0, 0, databender$$1.imageData.width, databender$$1.imageData.height/config$$1.numberOfGrains));
+        databender$$1
+          .render(originalBuffer)
+          .then((buffer) =>
+            databender$$1.draw(
+              buffer,
+              renderCanvas.getContext("2d"),
+              0,
+              0,
+              0,
+              0,
+              databender$$1.imageData.width,
+              databender$$1.imageData.height / config$$1.numberOfGrains
+            )
+          );
       };
 
-      container.addEventListener('keypress', (e) => {
-        var keyboard = '`qwertyuiopasdfghjklzxcvbnm';
+      container.addEventListener("keypress", (e) => {
+        var keyboard = "`qwertyuiopasdfghjklzxcvbnm";
 
-        if (e.code === 'Backslash') {
+        if (e.code === "Backslash") {
           audioGranularSynth.stop();
           videoGranularSynth.stop();
         }
 
         // Key codes are kind of inflexible if you're using a shift+key
-        if (e.code === 'Equal') config$$1.numberOfGrains > 0 ? config$$1.numberOfGrains += 5 : 0;
-        if (e.key === '-') config$$1.numberOfGrains > 0 ? config$$1.numberOfGrains -= 5 : 0;
+        if (e.code === "Equal")
+          config$$1.numberOfGrains > 0 ? (config$$1.numberOfGrains += 5) : 0;
+        if (e.key === "-")
+          config$$1.numberOfGrains > 0 ? (config$$1.numberOfGrains -= 5) : 0;
 
-        keyboard.toUpperCase().split('').forEach((letter, index$$1) => {
-          if (e.code === `Key${letter}`) {
-            config$$1.grainIndex = index$$1 + 1;          
-          }
-        });
+        keyboard
+          .toUpperCase()
+          .split("")
+          .forEach((letter, index$$1) => {
+            if (e.code === `Key${letter}`) {
+              config$$1.grainIndex = index$$1 + 1;
+            }
+          });
 
         audioGranularSynth.updateValues(audioGranularSynth.config);
         videoGranularSynth.updateValues(videoGranularSynth.config);
       });
-      
+
       audioGranularSynth.play(audioTriggerCallback, audioGranularSynth.config);
       videoGranularSynth.play(videoTriggerCallback, videoGranularSynth.config);
     };
-
   }
 
-  function main () {
-    window.OfflineAudioContext = window.OfflineAudioContext || webkitOfflineAudioContext;
+  function main() {
+    window.OfflineAudioContext =
+      window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioContext = new AudioContext();
-    const g1Config = JSON.parse(JSON.stringify(config)); 
-    const g2Config = JSON.parse(JSON.stringify(config)); 
-    createGranularSynth('granular-synth', audioContext, g1Config);
-    createGranularSynth('granular-synth-2', audioContext, g2Config);
+    const defaultConfig = JSON.parse(JSON.stringify(config));
+    let granularSynthCount = 0;
+
+    const handleClick = (e) => {
+      granularSynthCount += 1;
+      createGranularSynth(
+        `granular-synth-${granularSynthCount}`,
+        audioContext,
+        defaultConfig
+      );
+    };
+
+    const button = document.querySelector(".add-granular-synth");
+
+    button.addEventListener("click", handleClick);
   }
+
   main();
 
 }());
