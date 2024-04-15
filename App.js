@@ -1,7 +1,7 @@
 import Databender from 'databender';
-import config from './config.json';
-import GranularSynth from './granular';
 import dat from 'dat.gui';
+import config from './config.json' assert { type: "json" };
+import { GranularSynth }  from './GranularSynth.js';
 
 function handleDatGUI(audioGranularSynth, videoGranularSynth){
   const gui = new dat.GUI();
@@ -132,8 +132,7 @@ function handleDragEnd(e) {
   e.preventDefault();
 }
 
-function main () {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
+export function App () {
   const audioCtx = new AudioContext();
   const renderCanvas = document.querySelector('#canvas');
   const dropzone = document.querySelector('.dropzone');
@@ -211,5 +210,3 @@ function main () {
   };
 };
 
-window.OfflineAudioContext = window.OfflineAudioContext || webkitOfflineAudioContext;
-main();
