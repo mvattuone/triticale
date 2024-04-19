@@ -3,22 +3,11 @@
   <head>
     <meta charset="utf-8">
     <title>Webaudio Databending</title>
-    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="dropzone">
-      <p>Drop file here to upload</p>
-    </div>
-    <button>Make something cool</button>
-    <canvas width="1280" height="768" id="canvas"></canvas>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tunajs/1.0.4/tuna.js"></script>
     <script type="importmap">
     {
-      "imports": {
-        "databender": "/node_modules/databender/index.js",
-        "dat.gui": "/node_modules/dat.gui/build/dat.gui.module.js",
-        "lodash.chunk": "/node_modules/lodash.chunk/index.js"
-      }
+      "imports": {}
     }
     </script>
     <script type="module">
@@ -26,15 +15,6 @@
 
       App();
 
-    </script>
-    <script>
-      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-
-ga('create', 'UA-100494280-1', 'auto');
-ga('send', 'pageview');
     </script>
   </body>
 </html>
