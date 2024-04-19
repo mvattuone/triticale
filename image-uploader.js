@@ -60,6 +60,12 @@ export default class ImageUploader extends HTMLElement {
     }
     const reader = new FileReader();
     reader.onload = (event) => {
+      const customEvent = new CustomEvent("image-uploaded", {
+        detail: event.target.result,
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(customEvent);
     };
     reader.readAsDataURL(file);
   };
