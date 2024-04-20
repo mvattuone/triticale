@@ -14,6 +14,7 @@ export default class SynthWaveform extends HTMLElement {
     this.context = this.canvas.getContext("2d");
     this.canvas.width = 1000;
     this.canvas.height = 300;
+    this.audioCtx = this.closest('synth-brain').audioCtx;
   connectedCallback() {
     this.addEventListener("update-audio", this.handleAudioUploaded);
     console.log("Listener for update-audio added.");
