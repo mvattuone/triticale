@@ -58,3 +58,4 @@ export default class SynthWaveform extends HTMLElement {
   }
 }
 
+customElements.define("synth-waveform", SynthWaveform);
