@@ -13,10 +13,11 @@ export default class PlayButton extends HTMLElement {
   }
 
   handleClick() {
-    this.buffer = this.previousElementSibling.buffer;
+    const waveform = document.querySelector('synth-waveform');
+    this.buffer = waveform.buffer;
     this.selection = {};
-    this.selection.start = this.previousElementSibling.selection.start;
-    this.selection.end = this.previousElementSibling.selection.end;
+    this.selection.start = waveform.selection.start;
+    this.selection.end = waveform.selection.end;
     if (!this.buffer) return;
 
     if (!this.playing) {
