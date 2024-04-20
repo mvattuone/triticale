@@ -27,6 +27,10 @@ export default class AudioUploader extends HTMLElement {
     dropzone.ondragover = this.handleDragOver.bind(this);
     dropzone.ondragleave = this.handleDragLeave.bind(this);
     dropzone.ondrop = this.handleDrop.bind(this);
+
+    this.audioCtx = this.closest('synth-brain').audioCtx;
+  }
+
   handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy"; // Explicitly show this is a copy.
@@ -62,6 +66,12 @@ export default class AudioUploader extends HTMLElement {
       this.audioCtx.decodeAudioData(
         reader.result,
         (buffer) => {
+          const customEvent = new CustomEvent("audio-uploaded", {
+            detail: { buffer },
+            bubbles: true,
+            composed: true,
+          });
+          this.dispatchEvent(customEvent);
         },
         (error) => {
           console.error("Error decoding audio file:", error);
