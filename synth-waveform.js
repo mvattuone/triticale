@@ -62,6 +62,12 @@ export default class SynthWaveform extends HTMLElement {
       this.selectionToPixels.end = x;
       this.selection.end = this.pixelToSampleIndex(x);
       this.drawSelection();
+      const updateSampleEvent = new CustomEvent('update-sample', {
+        detail: { selection: this.selection, buffer: this.buffer },
+        bubbles: true,
+        composed: true,
+      });
+      this.dispatchEvent(updateSampleEvent);
       console.log(
         `Selection from ${this.selection.start} to ${this.selection.end}`,
       );
