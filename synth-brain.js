@@ -40,7 +40,9 @@ export default class SynthBrain extends HTMLElement {
   updateNumberOfGrains(e) {
     this.numberOfGrains = e.detail;
 
-    this.grains = this.createGrains();
+    if (this.sample) {
+      this.grains = this.createGrains();
+    }
   }
 
   handleAudioUploaded(event) {
@@ -123,13 +125,17 @@ export default class SynthBrain extends HTMLElement {
         this.bufferSource.buffer = this.grains[grainIndex];
         this.bufferSource.loop = false;
         this.bufferSource.connect(this.audioCtx.destination);
+        this.bufferSource.onended = () => {
+          this.bufferSource.stop();
+          this.bufferSource.disconnect();
+        }
         this.bufferSource.start(0);
 
         then = now - (delta % interval);
 
       }
 
-      requestAnimationFrame(() => { triggerGrain(9) });
+      this.scheduler = requestAnimationFrame(() => { triggerGrain(9) });
     }
 
     this.scheduler = requestAnimationFrame(() => {
