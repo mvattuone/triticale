@@ -89,7 +89,7 @@ export default class SynthBrain extends HTMLElement {
 
   updateSample(e) {
     const { selection, buffer } = e.detail;
-    const frameCount = selection.end - selection.start;
+    const frameCount = selection.end > selection.start ? selection.end - selection.start : selection.start - selection.end;
     const numberOfChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
 
