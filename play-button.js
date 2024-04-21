@@ -13,29 +13,14 @@ export default class PlayButton extends HTMLElement {
   }
 
   handleClick() {
-    const waveform = document.querySelector('synth-waveform');
-    this.buffer = waveform.buffer;
-    this.selection = {};
-    this.selection.start = waveform.selection.start;
-    this.selection.end = waveform.selection.end;
-    if (!this.buffer) return;
-
     if (!this.playing) {
       this.playing = true;
       this.button.innerText = 'Stop';
-      const playSynthEvent = new CustomEvent("play-synth", {
-        detail: { selection: this.selection, buffer: this.buffer },
-        bubbles: true,
-        composed: true,
-      });
+      const playSynthEvent = new Event("play-synth", { composed: true, bubbles: true });
       this.dispatchEvent(playSynthEvent);
 
     } else {
-      const stopSynthEvent = new CustomEvent("stop-synth", {
-        detail: { selection: this.selection, buffer: this.buffer },
-        bubbles: true,
-        composed: true,
-      });
+      const stopSynthEvent = new Event("stop-synth", { composed: true, bubbles: true });
       this.dispatchEvent(stopSynthEvent);
       this.button.innerText = 'Play';
       this.playing = false;
