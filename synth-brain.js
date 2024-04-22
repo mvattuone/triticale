@@ -1,3 +1,5 @@
+import Databender from 'databender';
+
 const chunk = (arr, chunkSize, cache = []) => {
   const tmp = [...arr]
   if (chunkSize <= 0) return cache
@@ -10,7 +12,10 @@ export default class SynthBrain extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this.audioCtx = new AudioContext();
-    this.numberOfGrains = 2;
+    this.databender = new Databender({}, this.audioCtx);
+    this.audioGrains = [];
+    this.visualGrains = [];
+    this.numberOfGrains = 10;
     this.shadowRoot.innerHTML = `
       <slot></slot>
     `; 
@@ -20,28 +25,30 @@ export default class SynthBrain extends HTMLElement {
   connectedCallback() {
     this.addEventListener("image-uploaded", this.handleImageUploaded);
     this.addEventListener("audio-uploaded", this.handleAudioUploaded);
-    this.addEventListener("update-sample", this.updateSample);
+    this.addEventListener("update-sample", this.updateAudioSelection);
     this.addEventListener("play-synth", this.playSynth);
     this.addEventListener("stop-synth", this.stopSynth);
     this.addEventListener("update-number-of-grains", this.updateNumberOfGrains);
-    console.log("Listener for image-uploaded added successfully.");
   }
 
   disconnectedCallback() {
     this.removeEventListener("image-uploaded", this.handleImageUploaded);
     this.removeEventListener("audio-uploaded", this.handleAudioUploaded);
-    this.removeEventListener("update-sample", this.updateSample);
+    this.removeEventListener("update-sample", this.updateAudioSelection);
     this.removeEventListener("play-synth", this.playSynth);
     this.removeEventListener("stop-synth", this.stopSynth);
     this.removeEventListener("update-number-of-grains", this.updateNumberOfGrains);
-    console.log("Listener for image-uploaded removed.");
   }
 
   updateNumberOfGrains(e) {
     this.numberOfGrains = e.detail;
 
-    if (this.sample) {
-      this.grains = this.createGrains();
+    if (this.imageBuffer) {
+      this.imageGrains = this.createGrains(this.imageBuffer);
+    }
+
+    if (this.audioSelection) {
+      this.audioGrains = this.createGrains(this.audioSelection);
     }
   }
 
@@ -57,20 +64,31 @@ export default class SynthBrain extends HTMLElement {
   }
 
   handleImageUploaded(event) {
-    const eventData = event.detail;
-    const updateImageEvent = new CustomEvent("update-image", {
-      detail: eventData,
-      bubbles: true,
-      composed: true,
-    });
-    this.querySelector("synth-display").dispatchEvent(updateImageEvent);
-    console.log("Custom event update-image dispatched.");
+    const imageData = event.detail;
+
+    const img = new Image();
+    img.onload = () => {
+      this.image = img;
+      this.databender.convert(img)
+        .then((buffer) => {
+          this.imageBuffer = buffer;
+          this.imageGrains = this.createGrains(this.imageBuffer);
+          const updateImageEvent = new CustomEvent("update-image", {
+            detail: img,
+            bubbles: true,
+            composed: true,
+          });
+          this.querySelector("synth-display").dispatchEvent(updateImageEvent);
+          console.log("Custom event update-image dispatched.");
+        })
+    };
+    img.src = imageData;
   }
 
-  createGrains() {
-    const grainSize = Math.floor(this.sample.length / this.numberOfGrains);
+  createGrains(sample) {
+    const grainSize = Math.floor(sample.length / this.numberOfGrains);
 
-    const chunks = chunk(this.sample.getChannelData(0), grainSize);
+    const chunks = chunk(sample.getChannelData(0), grainSize);
 
     const grains = chunks.map(chunk => {
       const grainBuffer = this.audioCtx.createBuffer(1, chunk.length, this.audioCtx.sampleRate);
@@ -89,13 +107,13 @@ export default class SynthBrain extends HTMLElement {
     return grains;
   }
 
-  updateSample(e) {
+  updateAudioSelection(e) {
     const { selection, buffer } = e.detail;
     const frameCount = selection.end > selection.start ? selection.end - selection.start : selection.start - selection.end;
     const numberOfChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
 
-    this.sample = this.audioCtx.createBuffer(
+    this.audioSelection = this.audioCtx.createBuffer(
       numberOfChannels,
       frameCount,
       sampleRate,
@@ -103,11 +121,13 @@ export default class SynthBrain extends HTMLElement {
 
     for (let channel = 0; channel < numberOfChannels; channel++) {
       const originalData = buffer.getChannelData(channel);
-      const newData = this.sample.getChannelData(channel);
+      const newData = this.audioSelection.getChannelData(channel);
       for (let i = 0; i < frameCount; i++) {
         newData[i] = originalData[i + selection.start];
       }
     }
+
+    this.audioGrains = this.createGrains(this.audioSelection)
   }
 
   playSynth() {
@@ -115,14 +135,33 @@ export default class SynthBrain extends HTMLElement {
     let then = Date.now();
     let delta;
 
-    const triggerGrain = (grainIndex) => {
-      const interval = (this.grains[grainIndex].duration * 1000) / 60;
+    const triggerImageGrain = (grainIndex) => {
+      const interval = (this.imageGrains[grainIndex].duration * 1000) / 60;
+      now = Date.now();
+      delta = now - then;
+
+      if (delta > interval) {
+        const canvas = document.querySelector('synth-display').shadowRoot.querySelector('canvas')
+        const context = canvas.getContext('2d');
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        this.databender.render(this.imageGrains[grainIndex])
+          .then((buffer) => this.databender.draw(buffer, context, 0, 0, 0, 0, this.databender.imageData.width, this.databender.imageData.height/this.numberOfGrains, canvas.width, canvas.height))
+
+        then = now - (delta % interval);
+
+      }
+
+      this.scheduler = requestAnimationFrame(() => { triggerImageGrain(9) });
+    }
+
+    const triggerAudioGrain = (grainIndex) => {
+      const interval = (this.audioGrains[grainIndex].duration * 1000) / 60;
       now = Date.now();
       delta = now - then;
 
       if (delta > interval) {
         this.bufferSource = this.audioCtx.createBufferSource();
-        this.bufferSource.buffer = this.grains[grainIndex];
+        this.bufferSource.buffer = this.audioGrains[grainIndex];
         this.bufferSource.loop = false;
         this.bufferSource.connect(this.audioCtx.destination);
         this.bufferSource.onended = () => {
@@ -135,16 +174,34 @@ export default class SynthBrain extends HTMLElement {
 
       }
 
-      this.scheduler = requestAnimationFrame(() => { triggerGrain(9) });
+      this.scheduler = requestAnimationFrame(() => { triggerAudioGrain(9) });
     }
 
     this.scheduler = requestAnimationFrame(() => {
-      triggerGrain(9);
+      if (this.audioGrains.length > 0) {
+        triggerAudioGrain(9);
+      }
+
+      if (this.imageGrains.length > 0) {
+        triggerImageGrain(9);
+      }
     });
   }
 
   stopSynth() {
-    this.bufferSource.stop();
+    if (this.bufferSource) {
+      this.bufferSource.stop();
+    }
+
+    if (this.image) {
+      const updateImageEvent = new CustomEvent("update-image", {
+        detail: this.image,
+        bubbles: true,
+        composed: true,
+      });
+      this.querySelector("synth-display").dispatchEvent(updateImageEvent);
+    }
+
     cancelAnimationFrame(this.scheduler);
   }
 }

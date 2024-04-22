@@ -27,19 +27,15 @@ class SynthDisplay extends HTMLElement {
   }
 
   handleImageUploaded(event) {
-    const imageDataUrl = event.detail;
-    this.loadImage(imageDataUrl);
+    const image = event.detail;
+    this.drawImage(image);
   }
 
-  loadImage(src) {
-    const img = new Image();
-    img.onload = () => {
-      this.canvas.width = img.width;
-      this.canvas.height = img.height;
-      this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      this.context.drawImage(img, 0, 0);
-    };
-    img.src = src;
+  drawImage(img) {
+    this.canvas.width = img.width;
+    this.canvas.height = img.height;
+    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.context.drawImage(img, 0, 0);
   }
 }
 
