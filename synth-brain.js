@@ -1,11 +1,11 @@
-import Databender from 'databender';
+import Databender from "databender";
 
 const chunk = (arr, chunkSize, cache = []) => {
-  const tmp = [...arr]
-  if (chunkSize <= 0) return cache
-  while (tmp.length) cache.push(tmp.splice(0, chunkSize))
-  return cache
-}
+  const tmp = [...arr];
+  if (chunkSize <= 0) return cache;
+  while (tmp.length) cache.push(tmp.splice(0, chunkSize));
+  return cache;
+};
 
 export default class SynthBrain extends HTMLElement {
   constructor() {
@@ -19,7 +19,7 @@ export default class SynthBrain extends HTMLElement {
     this.density = 1;
     this.shadowRoot.innerHTML = `
       <slot></slot>
-    `; 
+    `;
     this.bufferSource;
   }
 
@@ -39,7 +39,10 @@ export default class SynthBrain extends HTMLElement {
     this.removeEventListener("update-sample", this.updateAudioSelection);
     this.removeEventListener("play-synth", this.playSynth);
     this.removeEventListener("stop-synth", this.stopSynth);
-    this.removeEventListener("update-number-of-grains", this.updateNumberOfGrains);
+    this.removeEventListener(
+      "update-number-of-grains",
+      this.updateNumberOfGrains,
+    );
     this.removeEventListener("update-density", this.updateDensity);
   }
 
@@ -76,20 +79,19 @@ export default class SynthBrain extends HTMLElement {
     const img = new Image();
     img.onload = () => {
       this.image = img;
-      this.databender.convert(img)
-        .then((buffer) => {
-          // We need to figure out a way to separate the initial uploaded image
-          // OR we immediately display a grain version instead of the real thing?
-          this.imageBuffer = buffer;
-          this.imageGrains = this.createGrains(this.imageBuffer);
-          const updateImageEvent = new CustomEvent("update-image", {
-            detail: img,
-            bubbles: true,
-            composed: true,
-          });
-          this.querySelector("synth-display").dispatchEvent(updateImageEvent);
-          console.log("Custom event update-image dispatched.");
-        })
+      this.databender.convert(img).then((buffer) => {
+        // We need to figure out a way to separate the initial uploaded image
+        // OR we immediately display a grain version instead of the real thing?
+        this.imageBuffer = buffer;
+        this.imageGrains = this.createGrains(this.imageBuffer);
+        const updateImageEvent = new CustomEvent("update-image", {
+          detail: img,
+          bubbles: true,
+          composed: true,
+        });
+        this.querySelector("synth-display").dispatchEvent(updateImageEvent);
+        console.log("Custom event update-image dispatched.");
+      });
     };
     img.src = imageData;
   }
@@ -99,26 +101,32 @@ export default class SynthBrain extends HTMLElement {
 
     const chunks = chunk(sample.getChannelData(0), grainSize);
 
-    const grains = chunks.map(chunk => {
-      const grainBuffer = this.audioCtx.createBuffer(1, chunk.length, this.audioCtx.sampleRate);
+    const grains = chunks.map((chunk) => {
+      const grainBuffer = this.audioCtx.createBuffer(
+        1,
+        chunk.length,
+        this.audioCtx.sampleRate,
+      );
       const grainBufferData = grainBuffer.getChannelData(0);
 
       for (let i = 0; i < chunk.length; i++) {
-        grainBufferData[i] = chunk[i]; 
+        grainBufferData[i] = chunk[i];
       }
 
       console.log(grainBuffer.duration);
 
       return grainBuffer;
     });
-    
 
     return grains;
   }
 
   updateAudioSelection(e) {
     const { selection, buffer } = e.detail;
-    const frameCount = selection.end > selection.start ? selection.end - selection.start : selection.start - selection.end;
+    const frameCount =
+      selection.end > selection.start
+        ? selection.end - selection.start
+        : selection.start - selection.end;
     const numberOfChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
 
@@ -136,7 +144,7 @@ export default class SynthBrain extends HTMLElement {
       }
     }
 
-    this.audioGrains = this.createGrains(this.audioSelection)
+    this.audioGrains = this.createGrains(this.audioSelection);
   }
 
   playSynth() {
@@ -150,21 +158,38 @@ export default class SynthBrain extends HTMLElement {
       delta = now - then;
 
       if (delta > interval) {
-        const canvas = document.querySelector('synth-display').shadowRoot.querySelector('canvas')
-        const context = canvas.getContext('2d');
+        const canvas = document
+          .querySelector("synth-display")
+          .shadowRoot.querySelector("canvas");
+        const context = canvas.getContext("2d");
         context.clearRect(0, 0, canvas.width, canvas.height);
-        this.databender.render(this.imageGrains[grainIndex])
-          .then((buffer) => this.databender.draw(buffer, context, 0, 0, 0, 0, this.databender.imageData.width, this.databender.imageData.height/this.numberOfGrains, canvas.width, canvas.height))
+        this.databender
+          .render(this.imageGrains[grainIndex])
+          .then((buffer) =>
+            this.databender.draw(
+              buffer,
+              context,
+              0,
+              0,
+              0,
+              0,
+              this.databender.imageData.width,
+              this.databender.imageData.height / this.numberOfGrains,
+              canvas.width,
+              canvas.height,
+            ),
+          );
 
         then = now - (delta % interval);
-
       }
 
       const randomGrainIndex = 9;
-      this.scheduler = requestAnimationFrame(() => { triggerImageGrain(randomGrainIndex) });
-    }
+      this.scheduler = requestAnimationFrame(() => {
+        triggerImageGrain(randomGrainIndex);
+      });
+    };
 
-    this.then  = Date.now();
+    this.then = Date.now();
 
     const triggerAudioGrain = (grainIndex) => {
       const interval = 1000 / this.density;
@@ -199,13 +224,16 @@ export default class SynthBrain extends HTMLElement {
       }
 
       const randomGrainIndex = 9;
-      let nextCall = interval - delta % interval;
+      let nextCall = interval - (delta % interval);
 
-      this.audioScheduler = setTimeout(() => { triggerAudioGrain(randomGrainIndex) }, nextCall);
-    }
       if (this.audioScheduler) {
         clearTimeout(this.audioScheduler);
       }
+
+      this.audioScheduler = setTimeout(() => {
+        triggerAudioGrain(randomGrainIndex);
+      }, nextCall);
+    };
 
     this.scheduler = requestAnimationFrame(() => {
       if (this.imageGrains.length > 0) {

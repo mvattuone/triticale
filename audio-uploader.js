@@ -28,7 +28,7 @@ export default class AudioUploader extends HTMLElement {
     dropzone.ondragleave = this.handleDragLeave.bind(this);
     dropzone.ondrop = this.handleDrop.bind(this);
 
-    this.audioCtx = this.closest('synth-brain').audioCtx;
+    this.audioCtx = this.closest("synth-brain").audioCtx;
   }
 
   handleDragOver(e) {

@@ -1,12 +1,11 @@
-import { Grain } from './Grain.js';
+import { Grain } from "./Grain.js";
 
 const chunk = (arr, chunkSize = 1, cache = []) => {
-  const tmp = [...arr]
-  if (chunkSize <= 0) return cache
-  while (tmp.length) cache.push(tmp.splice(0, chunkSize))
-  return cache
-}
-
+  const tmp = [...arr];
+  if (chunkSize <= 0) return cache;
+  while (tmp.length) cache.push(tmp.splice(0, chunkSize));
+  return cache;
+};
 
 export class GranularSynth {
   constructor(context, config) {
@@ -23,30 +22,36 @@ export class GranularSynth {
     const grainSize = Math.floor(buffer.length / this.config.numberOfGrains);
     const chunks = chunk(rawData, grainSize);
     this.buffer = buffer;
-    this.grains = chunks.map(function(data) {
-      return new Grain(this.context, data, this.output, this.config)
-    }.bind(this));
+    this.grains = chunks.map(
+      function (data) {
+        return new Grain(this.context, data, this.output, this.config);
+      }.bind(this),
+    );
   }
 
   updateGrains() {
-    const grainSize = Math.floor(this.buffer.length / this.config.numberOfGrains);
+    const grainSize = Math.floor(
+      this.buffer.length / this.config.numberOfGrains,
+    );
     const rawData = this.buffer.getChannelData(0);
     const chunks = chunk(rawData, grainSize);
-    this.grains = chunks.map(function(data) {
-      return new Grain(this.context, data, this.output, this.config)
-    }.bind(this));
+    this.grains = chunks.map(
+      function (data) {
+        return new Grain(this.context, data, this.output, this.config);
+      }.bind(this),
+    );
   }
 
-  updateValues(config) { 
+  updateValues(config) {
     this.config = config;
     this.updateGrains();
-  };
+  }
 
-  stop() { 
+  stop() {
     cancelAnimationFrame(this.scheduler);
     this.stopLoop = true;
     return;
-  };
+  }
 
   play(callback) {
     this.stopLoop = false;
@@ -55,13 +60,15 @@ export class GranularSynth {
     let then = Date.now();
     let delta;
 
-    const triggerGrain = function() {
+    const triggerGrain = function () {
       if (!this.stopLoop) {
         requestAnimationFrame(triggerGrain.bind(this));
       }
 
       let grainIndex = this.config.grainIndex;
-      const interval = (this.grains[grainIndex].buffer.duration * 1000) / this.config.frameRate;
+      const interval =
+        (this.grains[grainIndex].buffer.duration * 1000) /
+        this.config.frameRate;
       now = Date.now();
       delta = now - then;
 
@@ -81,11 +88,10 @@ export class GranularSynth {
 
         then = now - (delta % interval);
       }
-    }
+    };
 
     this.scheduler = requestAnimationFrame(() => {
-      triggerGrain.call(this)
+      triggerGrain.call(this);
     });
-  };
-};
-
+  }
+}
