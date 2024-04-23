@@ -16,18 +16,20 @@ export default class SynthWaveform extends HTMLElement {
     this.canvas.height = 300;
     this.selection = { start: null, end: null };
     this.selectionToPixels = { start: null, end: null };
-    this.audioCtx = this.closest('synth-brain').audioCtx;
+    this.audioCtx = this.closest("synth-brain").audioCtx;
     this.addEventListeners();
   }
 
   connectedCallback() {
     this.addEventListener("update-audio", this.handleAudioUploaded);
-    console.log("Listener for update-audio added.");
+    this.addEventListener("clear-grain", this.clearGrain);
+    this.addEventListener("draw-grain", this.drawGrain);
   }
 
   disconnectedCallback() {
     this.removeEventListener("update-audio", this.handleAudioUploaded);
-    console.log("Listener for update-audio removed.");
+    this.removeEventListener("clear-grain", this.clearGrain);
+    this.removeEventListener("draw-grain", this.drawGrain);
   }
 
   handleAudioUploaded(event) {
@@ -52,6 +54,7 @@ export default class SynthWaveform extends HTMLElement {
       const x = e.offsetX;
       this.selectionToPixels.end = x;
       this.selection.end = this.pixelToSampleIndex(x);
+      this.drawWaveform();
       this.drawSelection();
     });
 
@@ -61,23 +64,25 @@ export default class SynthWaveform extends HTMLElement {
       const x = e.offsetX;
       this.selectionToPixels.end = x;
       this.selection.end = this.pixelToSampleIndex(x);
+      this.drawWaveform();
       this.drawSelection();
-      const updateSampleEvent = new CustomEvent('update-sample', {
+      const updateSampleEvent = new CustomEvent("update-sample", {
         detail: { selection: this.selection, buffer: this.buffer },
         bubbles: true,
         composed: true,
       });
       this.dispatchEvent(updateSampleEvent);
-      console.log(
-        `Selection from ${this.selection.start} to ${this.selection.end}`,
-      );
     });
   }
 
   drawSelection() {
-    this.drawWaveform(this.channelData);
-    if (this.selectionToPixels.start !== null && this.selectionToPixels.end !== null) {
+    if (
+      this.selectionToPixels.start !== null &&
+      this.selectionToPixels.end !== null
+    ) {
       this.context.fillStyle = "rgba(0, 100, 255, 0.3)";
+      this.selectionX = Math.min(this.selectionToPixels.start, this.selectionToPixels.end),
+      this.selectionWidth = Math.abs(this.selectionToPixels.end - this.selectionToPixels.start)
       this.context.fillRect(
         Math.min(this.selectionToPixels.start, this.selectionToPixels.end),
         0,
@@ -87,21 +92,41 @@ export default class SynthWaveform extends HTMLElement {
     }
   }
 
-  drawWaveform(channel) {
+  drawWaveform() {
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     this.samplesPerPixel = Math.floor(
       this.channelData.length / this.canvas.width,
     );
 
-    for (var i = 0; i < channel.length; i += this.samplesPerPixel) {
-      var x = Math.floor((this.canvas.width * i) / channel.length);
-      var y = (channel[i] * this.canvas.height) / 2;
+    for (var i = 0; i < this.channelData.length; i += this.samplesPerPixel) {
+      var x = Math.floor((this.canvas.width * i) / this.channelData.length);
+      var y = (this.channelData[i] * this.canvas.height) / 2;
       this.context.beginPath();
       this.context.moveTo(x, 0);
       this.context.lineTo(x + 1, y);
       this.context.stroke();
     }
+  }
+
+  drawGrain(e) {
+    this.drawWaveform();
+    if (this.selection.start || this.selection.end) {
+      this.drawSelection();
+    }
+    const { grainIndex, grains } = e.detail;
+    const grainWidth = Math.round(this.selectionWidth / grains.length);
+    const grainHeight = this.canvas.height;
+
+    const x = this.selectionX + Math.floor(grainWidth * grainIndex);
+    const y = 0;
+    this.context.fillStyle = "#ff0000";
+    this.context.fillRect(x, y, grainWidth, grainHeight);
+  }
+
+  clearGrain() {
+    this.drawWaveform();
+    this.drawSelection();
   }
 
   loadAudio(buffer) {
@@ -110,7 +135,7 @@ export default class SynthWaveform extends HTMLElement {
     this.channelData = channel;
     this.canvas.width = 1000;
     this.canvas.height = 300;
-    this.drawWaveform(channel);
+    this.drawWaveform();
   }
 }
 
