@@ -1,5 +1,4 @@
-export default class FlexBox extends HTMLElement { 
-
+export default class FlexBox extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -14,6 +13,5 @@ export default class FlexBox extends HTMLElement {
     `;
   }
 }
-
 
 customElements.define("flex-box", FlexBox);
