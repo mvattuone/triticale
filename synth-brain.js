@@ -172,17 +172,28 @@ export default class SynthBrain extends HTMLElement {
       delta = now - this.then;
 
       if (delta > interval) {
+        this.bufferSource = this.audioCtx.createBufferSource();
+        this.bufferSource.buffer = this.audioGrains[grainIndex];
+        this.bufferSource.loop = false;
+        this.bufferSource.connect(this.audioCtx.destination);
 
-      this.bufferSource = this.audioCtx.createBufferSource();
-      this.bufferSource.buffer = this.audioGrains[grainIndex];
-      this.bufferSource.loop = false;
-      this.bufferSource.connect(this.audioCtx.destination);
+        this.bufferSource.onended = () => {
+          this.bufferSource.stop();
+          this.bufferSource.disconnect();
+          const clearGrainEvent = new Event('clear-grain', {
+            bubbles: true,
+            composed: true,
+          });
+          document.querySelector('synth-waveform').dispatchEvent(clearGrainEvent);
+        };
+        this.bufferSource.start(0);
 
-      this.bufferSource.onended = () => {
-        this.bufferSource.stop();
-        this.bufferSource.disconnect();
-      }
-      this.bufferSource.start(0);
+        const drawGrainEvent = new CustomEvent('draw-grain', {
+          detail: { grainIndex, grains: this.audioGrains},
+          bubbles: true,
+          composed: true,
+        });
+        document.querySelector('synth-waveform').dispatchEvent(drawGrainEvent);
 
         this.then = now;
       }
@@ -192,20 +203,22 @@ export default class SynthBrain extends HTMLElement {
 
       this.audioScheduler = setTimeout(() => { triggerAudioGrain(randomGrainIndex) }, nextCall);
     }
+      if (this.audioScheduler) {
+        clearTimeout(this.audioScheduler);
+      }
 
     this.scheduler = requestAnimationFrame(() => {
-
       if (this.imageGrains.length > 0) {
         const randomGrainIndex = 9;
         triggerImageGrain(randomGrainIndex);
       }
-
-
-      if (this.audioGrains.length > 0) {
-        const randomGrainIndex = 9;
-        triggerAudioGrain(randomGrainIndex);
-      }
     });
+
+
+    if (this.audioGrains.length > 0) {
+      const randomGrainIndex = 9;
+      triggerAudioGrain(randomGrainIndex);
+    }
   }
 
   stopSynth() {
