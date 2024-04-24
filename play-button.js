@@ -31,32 +31,6 @@ export default class PlayButton extends HTMLElement {
       this.playing = false;
     }
   }
-
-  playSelectedPartOfBuffer(originalBuffer, selectionStart, selectionEnd) {
-    const frameCount = selectionEnd - selectionStart;
-    const numberOfChannels = originalBuffer.numberOfChannels;
-    const sampleRate = originalBuffer.sampleRate;
-
-    let newBuffer = this.audioCtx.createBuffer(
-      numberOfChannels,
-      frameCount,
-      sampleRate,
-    );
-
-    for (let channel = 0; channel < numberOfChannels; channel++) {
-      const originalData = originalBuffer.getChannelData(channel);
-      const newData = newBuffer.getChannelData(channel);
-      for (let i = 0; i < frameCount; i++) {
-        newData[i] = originalData[i + selectionStart];
-      }
-    }
-
-    const source = this.audioCtx.createBufferSource();
-    source.buffer = newBuffer;
-    source.connect(this.audioCtx.destination);
-
-    source.start();
-  }
 }
 
 customElements.define("play-button", PlayButton);

@@ -16,6 +16,8 @@ export default class SynthWaveform extends HTMLElement {
     this.canvas.height = 300;
     this.selection = { start: null, end: null };
     this.selectionToPixels = { start: null, end: null };
+    this.selectionWidth = this.canvas.width;
+    this.selectionX = 0;
     this.audioCtx = this.closest("synth-brain").audioCtx;
     this.addEventListeners();
   }
@@ -33,7 +35,7 @@ export default class SynthWaveform extends HTMLElement {
   }
 
   handleAudioUploaded(event) {
-    const buffer = event.detail.buffer;
+    const { buffer } = event.detail;
     this.loadAudio(buffer);
   }
 

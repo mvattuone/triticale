@@ -47,23 +47,39 @@ export default class SynthBrain extends HTMLElement {
   
     const { name, value } = e.detail;
 
-    if (!this.config.includes(name)) {
+    if (!Object.keys(this.config).includes(name)) {
       console.warn(`${name} is not a valid config parameter`);
       return;
     }
 
     this.config = { ...this.config, [name]: value };
+
+    if (name === 'grainSize') {
+      if (this.imageBuffer) {
+        this.imageGrains = this.createGrains(this.imageBuffer);
+      }
+
+      if (this.audioSelection) {
+        this.audioGrains = this.createGrains(this.audioSelection);
+      }
+      
+
+    }
   }
 
   handleAudioUploaded(event) {
-    const eventData = event.detail;
+    const { buffer } = event.detail;
     const updateAudioEvent = new CustomEvent("update-audio", {
-      detail: eventData,
+      detail: { buffer },
       bubbles: true,
       composed: true,
     });
     this.querySelector("synth-waveform").dispatchEvent(updateAudioEvent);
-    console.log("Custom event update-audio dispatched.");
+    const numberOfChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+
+    this.audioSelection = buffer;
+    this.audioGrains = this.createGrains(this.audioSelection);
   }
 
   handleImageUploaded(event) {
@@ -83,7 +99,6 @@ export default class SynthBrain extends HTMLElement {
           composed: true,
         });
         this.querySelector("synth-display").dispatchEvent(updateImageEvent);
-        console.log("Custom event update-image dispatched.");
       });
     };
     img.src = imageData;
@@ -105,8 +120,6 @@ export default class SynthBrain extends HTMLElement {
       for (let i = 0; i < chunk.length; i++) {
         grainBufferData[i] = chunk[i];
       }
-
-      console.log(grainBuffer.duration);
 
       return grainBuffer;
     });
@@ -146,7 +159,7 @@ export default class SynthBrain extends HTMLElement {
     let delta;
 
     const triggerImageGrain = (grainIndex) => {
-      const interval = 1000 / this.config.density;
+      const interval = Math.max(1000 / this.config.density, this.imageGrains[grainIndex].duration);
       now = Date.now();
       delta = now - then;
 
@@ -176,7 +189,7 @@ export default class SynthBrain extends HTMLElement {
         then = now - (delta % interval);
       }
 
-      const randomGrainIndex = 9;
+      const randomGrainIndex = Math.floor(Math.random() * this.imageGrains.length);
       this.scheduler = requestAnimationFrame(() => {
         triggerImageGrain(randomGrainIndex);
       });
@@ -185,7 +198,7 @@ export default class SynthBrain extends HTMLElement {
     this.then = Date.now();
 
     const triggerAudioGrain = (grainIndex) => {
-      const interval = 1000 / this.config.density;
+      const interval = Math.max(1000 / this.config.density, this.audioGrains[grainIndex].duration);
       now = Date.now();
       delta = now - this.then;
 
@@ -216,7 +229,7 @@ export default class SynthBrain extends HTMLElement {
         this.then = now;
       }
 
-      const randomGrainIndex = 9;
+      const randomGrainIndex = Math.floor(Math.random() * this.audioGrains.length);
       let nextCall = interval - (delta % interval);
 
       if (this.audioScheduler) {
@@ -230,14 +243,14 @@ export default class SynthBrain extends HTMLElement {
 
     this.scheduler = requestAnimationFrame(() => {
       if (this.imageGrains.length > 0) {
-        const randomGrainIndex = 9;
+        const randomGrainIndex = Math.floor(Math.random() * this.imageGrains.length);
         triggerImageGrain(randomGrainIndex);
       }
     });
 
 
     if (this.audioGrains.length > 0) {
-      const randomGrainIndex = 9;
+      const randomGrainIndex = Math.floor(Math.random() * this.audioGrains.length);
       triggerAudioGrain(randomGrainIndex);
     }
   }
