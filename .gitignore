@@ -1,6 +1,5 @@
 .DS_Store
 node_modules
-samples
-bundle.js
 example.mp3
 example.jpeg
+notes.txt
