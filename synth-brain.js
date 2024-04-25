@@ -7,6 +7,65 @@ const chunk = (arr, chunkSize, cache = []) => {
   return cache;
 };
 
+function blackmanWindow(length) {
+    const alpha = 0.16;
+    const a0 = (1 - alpha) / 2;
+    const a1 = 0.5;
+    const a2 = alpha / 2;
+    let window = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+        window[i] = a0 - a1 * Math.cos((2 * Math.PI * i) / (length - 1)) + a2 * Math.cos((4 * Math.PI * i) / (length - 1));
+    }
+    return window;
+}
+
+function hammingWindow(length) {
+let window = new Float32Array(length);
+for (let i = 0; i < length; i++) {
+    window[i] = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (length - 1));
+}
+return window;
+}
+
+function hannWindow(length) {
+    let window = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+        window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (length - 1)));
+    }
+    return window;
+}
+
+function gaussianWindow(length, sigma = 0.4) {
+    const window = new Float32Array(length);
+    const midpoint = (length - 1) / 2;
+
+    for (let i = 0; i < length; i++) {
+        const x = (i - midpoint) / (sigma * midpoint);
+        window[i] = Math.exp(-0.5 * x * x);
+    }
+
+    return window;
+}
+
+function triangleWindow(length) {
+    const window = new Float32Array(length);
+    const midpoint = (length - 1) / 2;
+
+    for (let i = 0; i < length; i++) {
+        window[i] = 1 - Math.abs((i - midpoint) / midpoint);
+    }
+
+    return window;
+}
+
+const windowMap = {
+  blackman: blackmanWindow,
+  gaussian: gaussianWindow,
+  hann: hannWindow,
+  hamming: hammingWindow,
+  triangle: triangleWindow,
+};
+
 export default class SynthBrain extends HTMLElement {
   constructor() {
     super();
@@ -17,7 +76,8 @@ export default class SynthBrain extends HTMLElement {
     this.imageGrains = [];
     this.config = {
       grainSize: 10,
-      density: 1
+      density: 1,
+      window: 'hann',
     };
     this.shadowRoot.innerHTML = `
       <slot></slot>
@@ -152,6 +212,24 @@ export default class SynthBrain extends HTMLElement {
 
     this.audioGrains = this.createGrains(this.audioSelection);
   }
+  
+  applyWindowFunction(audioBuffer, windowFunction) {
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length;
+    const sampleRate = audioBuffer.sampleRate;
+    const windowCoefficients = windowFunction(length);
+    const processedBuffer = this.audioCtx.createBuffer(numberOfChannels, length, sampleRate);
+
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+        const inputData = audioBuffer.getChannelData(channel);
+        const outputData = processedBuffer.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+            outputData[i] = inputData[i] * windowCoefficients[i];
+        }
+    }
+
+    return processedBuffer;
+}
 
   playSynth() {
     let now;
@@ -160,6 +238,8 @@ export default class SynthBrain extends HTMLElement {
 
     const triggerImageGrain = (grainIndex) => {
       const interval = Math.max(1000 / this.config.density, this.imageGrains[grainIndex].duration);
+
+
       now = Date.now();
       delta = now - then;
 
@@ -169,8 +249,17 @@ export default class SynthBrain extends HTMLElement {
           .shadowRoot.querySelector("canvas");
         const context = canvas.getContext("2d");
         context.clearRect(0, 0, canvas.width, canvas.height);
+
+        const grainBuffer = this.imageGrains[grainIndex];
+
+        let windowedBuffer = grainBuffer;
+      
+        if (this.config.window !== 'none') {
+          windowedBuffer = this.applyWindowFunction(grainBuffer, windowMap[this.config.window]);
+        }
+
         this.databender
-          .render(this.imageGrains[grainIndex])
+          .render(windowedBuffer)
           .then((buffer) =>
             this.databender.draw(
               buffer,
@@ -203,8 +292,16 @@ export default class SynthBrain extends HTMLElement {
       delta = now - this.then;
 
       if (delta > interval) {
+        const grainBuffer = this.audioGrains[grainIndex];
+
+        let windowedBuffer = grainBuffer;
+      
+        if (this.config.window !== 'none') {
+          windowedBuffer = this.applyWindowFunction(grainBuffer, windowMap[this.config.window]);
+        }
+
         this.bufferSource = this.audioCtx.createBufferSource();
-        this.bufferSource.buffer = this.audioGrains[grainIndex];
+        this.bufferSource.buffer = windowedBuffer;
         this.bufferSource.loop = false;
         this.bufferSource.connect(this.audioCtx.destination);
 
