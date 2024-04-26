@@ -6,6 +6,7 @@ export default class FlexBox extends HTMLElement {
       <style>
         div {
           display: flex;
+          flex-direction: ${this.getAttribute('direction')};
         }
       </style>
 
