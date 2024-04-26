@@ -1,4 +1,6 @@
 export default class SynthSlider extends HTMLElement {
+  static observedAttributes = ['min', 'max'];
+
   constructor() {
     super();
 
@@ -47,6 +49,12 @@ export default class SynthSlider extends HTMLElement {
   }
 
   disconnectedCallback() {}
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    if ( name === 'max' && oldValue !== newValue) {
+      this.inputElement.setAttribute('max', newValue);
+    }
+  }
 }
 
 customElements.define("synth-slider", SynthSlider);

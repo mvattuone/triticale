@@ -75,6 +75,7 @@ export default class SynthBrain extends HTMLElement {
     this.audioGrains = [];
     this.imageGrains = [];
     this.config = {
+      grainIndex: 1,
       grainSize: 10,
       density: 1,
       window: 'hann',
@@ -121,9 +122,8 @@ export default class SynthBrain extends HTMLElement {
 
       if (this.audioSelection) {
         this.audioGrains = this.createGrains(this.audioSelection);
+        document.querySelector("synth-slider[name='grainIndex']").setAttribute('max', this.audioGrains.length - 1);
       }
-      
-
     }
   }
 
@@ -135,11 +135,10 @@ export default class SynthBrain extends HTMLElement {
       composed: true,
     });
     this.querySelector("synth-waveform").dispatchEvent(updateAudioEvent);
-    const numberOfChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
 
     this.audioSelection = buffer;
     this.audioGrains = this.createGrains(this.audioSelection);
+    document.querySelector("synth-slider[name='grainIndex']").setAttribute('max', this.audioGrains.length - 1);
   }
 
   handleImageUploaded(event) {
@@ -278,9 +277,8 @@ export default class SynthBrain extends HTMLElement {
         then = now - (delta % interval);
       }
 
-      const randomGrainIndex = Math.floor(Math.random() * this.imageGrains.length);
       this.scheduler = requestAnimationFrame(() => {
-        triggerImageGrain(randomGrainIndex);
+        triggerImageGrain(this.config.grainIndex);
       });
     };
 
@@ -326,7 +324,6 @@ export default class SynthBrain extends HTMLElement {
         this.then = now;
       }
 
-      const randomGrainIndex = Math.floor(Math.random() * this.audioGrains.length);
       let nextCall = interval - (delta % interval);
 
       if (this.audioScheduler) {
@@ -334,21 +331,19 @@ export default class SynthBrain extends HTMLElement {
       }
 
       this.audioScheduler = setTimeout(() => {
-        triggerAudioGrain(randomGrainIndex);
+        triggerAudioGrain(this.config.grainIndex);
       }, nextCall);
     };
 
     this.scheduler = requestAnimationFrame(() => {
       if (this.imageGrains.length > 0) {
-        const randomGrainIndex = Math.floor(Math.random() * this.imageGrains.length);
-        triggerImageGrain(randomGrainIndex);
+        triggerImageGrain(this.config.grainIndex);
       }
     });
 
 
     if (this.audioGrains.length > 0) {
-      const randomGrainIndex = Math.floor(Math.random() * this.audioGrains.length);
-      triggerAudioGrain(randomGrainIndex);
+      triggerAudioGrain(this.config.grainIndex);
     }
   }
 
