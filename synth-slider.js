@@ -8,6 +8,7 @@ export default class SynthSlider extends HTMLElement {
     const min = this.getAttribute('min');
     const max = this.getAttribute('max');
     const label = this.getAttribute('label');
+    const step = this.getAttribute('step');
     const config = document.querySelector('synth-brain').config;
     let value = config[inputName] || 0;
 
@@ -17,7 +18,7 @@ export default class SynthSlider extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <div>
         <label for="${inputName}">${label}</label>
-        <input type="range" name="${inputName}" min="${min}" max="${max}" value="${value}" />
+        <input type="range" name="${inputName}" min="${min}" max="${max}" value="${value}" step="${step}" />
         <span>${value}</span>
       </div>
     `;

@@ -7,64 +7,13 @@ const chunk = (arr, chunkSize, cache = []) => {
   return cache;
 };
 
-function blackmanWindow(length) {
-    const alpha = 0.16;
-    const a0 = (1 - alpha) / 2;
-    const a1 = 0.5;
-    const a2 = alpha / 2;
+function hannWindow(length, modifier) {
     let window = new Float32Array(length);
     for (let i = 0; i < length; i++) {
-        window[i] = a0 - a1 * Math.cos((2 * Math.PI * i) / (length - 1)) + a2 * Math.cos((4 * Math.PI * i) / (length - 1));
+        window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (modifier * (length - 1))));
     }
     return window;
 }
-
-function hammingWindow(length) {
-let window = new Float32Array(length);
-for (let i = 0; i < length; i++) {
-    window[i] = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (length - 1));
-}
-return window;
-}
-
-function hannWindow(length) {
-    let window = new Float32Array(length);
-    for (let i = 0; i < length; i++) {
-        window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (length - 1)));
-    }
-    return window;
-}
-
-function gaussianWindow(length, sigma = 0.4) {
-    const window = new Float32Array(length);
-    const midpoint = (length - 1) / 2;
-
-    for (let i = 0; i < length; i++) {
-        const x = (i - midpoint) / (sigma * midpoint);
-        window[i] = Math.exp(-0.5 * x * x);
-    }
-
-    return window;
-}
-
-function triangleWindow(length) {
-    const window = new Float32Array(length);
-    const midpoint = (length - 1) / 2;
-
-    for (let i = 0; i < length; i++) {
-        window[i] = 1 - Math.abs((i - midpoint) / midpoint);
-    }
-
-    return window;
-}
-
-const windowMap = {
-  blackman: blackmanWindow,
-  gaussian: gaussianWindow,
-  hann: hannWindow,
-  hamming: hammingWindow,
-  triangle: triangleWindow,
-};
 
 export default class SynthBrain extends HTMLElement {
   constructor() {
@@ -75,10 +24,10 @@ export default class SynthBrain extends HTMLElement {
     this.audioGrains = [];
     this.imageGrains = [];
     this.config = {
-      grainIndex: 1,
+      grainIndex: 0,
       grainSize: 10,
       density: 1,
-      window: 'hann',
+      window: 1,
     };
     this.shadowRoot.innerHTML = `
       <slot></slot>
@@ -216,7 +165,7 @@ export default class SynthBrain extends HTMLElement {
     const numberOfChannels = audioBuffer.numberOfChannels;
     const length = audioBuffer.length;
     const sampleRate = audioBuffer.sampleRate;
-    const windowCoefficients = windowFunction(length);
+    const windowCoefficients = windowFunction(length, this.config.window);
     const processedBuffer = this.audioCtx.createBuffer(numberOfChannels, length, sampleRate);
 
     for (let channel = 0; channel < numberOfChannels; channel++) {
@@ -235,8 +184,8 @@ export default class SynthBrain extends HTMLElement {
     let then = Date.now();
     let delta;
 
-    const triggerImageGrain = (grainIndex) => {
-      const interval = Math.max(1000 / this.config.density, this.imageGrains[grainIndex].duration);
+    const triggerImageGrain = () => {
+      const interval = Math.max(1000 / this.config.density, this.imageGrains[this.config.grainIndex].duration);
 
 
       now = Date.now();
@@ -249,13 +198,9 @@ export default class SynthBrain extends HTMLElement {
         const context = canvas.getContext("2d");
         context.clearRect(0, 0, canvas.width, canvas.height);
 
-        const grainBuffer = this.imageGrains[grainIndex];
+        const grainBuffer = this.imageGrains[this.config.grainIndex];
 
-        let windowedBuffer = grainBuffer;
-      
-        if (this.config.window !== 'none') {
-          windowedBuffer = this.applyWindowFunction(grainBuffer, windowMap[this.config.window]);
-        }
+        const windowedBuffer = this.applyWindowFunction(grainBuffer, hannWindow);
 
         this.databender
           .render(windowedBuffer)
@@ -278,25 +223,21 @@ export default class SynthBrain extends HTMLElement {
       }
 
       this.scheduler = requestAnimationFrame(() => {
-        triggerImageGrain(this.config.grainIndex);
+        triggerImageGrain();
       });
     };
 
     this.then = Date.now();
 
-    const triggerAudioGrain = (grainIndex) => {
-      const interval = Math.max(1000 / this.config.density, this.audioGrains[grainIndex].duration);
+    const triggerAudioGrain = () => {
+      const interval = Math.max(1000 / this.config.density, this.audioGrains[this.config.grainIndex].duration);
       now = Date.now();
       delta = now - this.then;
 
       if (delta > interval) {
-        const grainBuffer = this.audioGrains[grainIndex];
-
-        let windowedBuffer = grainBuffer;
+        const grainBuffer = this.audioGrains[this.config.grainIndex];
       
-        if (this.config.window !== 'none') {
-          windowedBuffer = this.applyWindowFunction(grainBuffer, windowMap[this.config.window]);
-        }
+        const windowedBuffer = this.applyWindowFunction(grainBuffer, hannWindow);
 
         this.bufferSource = this.audioCtx.createBufferSource();
         this.bufferSource.buffer = windowedBuffer;
@@ -315,7 +256,7 @@ export default class SynthBrain extends HTMLElement {
         this.bufferSource.start(this.audioCtx.currentTime);
 
         const drawGrainEvent = new CustomEvent('draw-grain', {
-          detail: { grainIndex, grains: this.audioGrains},
+          detail: { grainIndex: this.config.grainIndex, grains: this.audioGrains},
           bubbles: true,
           composed: true,
         });
@@ -337,13 +278,13 @@ export default class SynthBrain extends HTMLElement {
 
     this.scheduler = requestAnimationFrame(() => {
       if (this.imageGrains.length > 0) {
-        triggerImageGrain(this.config.grainIndex);
+        triggerImageGrain();
       }
     });
 
 
     if (this.audioGrains.length > 0) {
-      triggerAudioGrain(this.config.grainIndex);
+      triggerAudioGrain();
     }
   }
 
