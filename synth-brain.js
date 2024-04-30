@@ -20,15 +20,34 @@ export default class SynthBrain extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this.audioCtx = new AudioContext();
-    this.databender = new Databender({}, this.audioCtx);
     this.audioGrains = [];
     this.imageGrains = [];
     this.config = {
-      grainIndex: 0,
+      effects: {
+        bitcrusher: {
+          bits: 4,
+          bufferSize: 4096,
+          normfreq: 0.1,
+          active: true,
+        },
+        convolver: {
+          highCut: 22050,
+          lowCut: 20,
+          dryLevel: 1,
+          wetLevel: 1, 
+          active: true,
+          level: 1,
+          impulse: 'minster1_000_ortf_48k.wav',
+        }
+      },
+      grainIndex: 1,
       grainSize: 10,
       density: 1,
       window: 1,
+      spray: 1,
+      random: 0,
     };
+    this.databender = new Databender(this.config.effects, this.audioCtx);
     this.shadowRoot.innerHTML = `
       <slot></slot>
     `;
@@ -41,7 +60,7 @@ export default class SynthBrain extends HTMLElement {
     this.addEventListener("update-sample", this.updateAudioSelection);
     this.addEventListener("play-synth", this.playSynth);
     this.addEventListener("stop-synth", this.stopSynth);
-    this.addEventListener("update-config", this.updateConfig);
+    this.addEventListener("update-config", this.handleUpdateConfig);
   }
 
   disconnectedCallback() {
@@ -50,16 +69,26 @@ export default class SynthBrain extends HTMLElement {
     this.removeEventListener("update-sample", this.updateAudioSelection);
     this.removeEventListener("play-synth", this.playSynth);
     this.removeEventListener("stop-synth", this.stopSynth);
-    this.removeEventListener("update-config", this.updateConfig);
+    this.removeEventListener("update-config", this.handleupdateConfig);
   }
 
-  updateConfig(e) { 
-  
+  handleUpdateConfig(e) {
     const { name, value } = e.detail;
 
-    if (!Object.keys(this.config).includes(name)) {
+    return this.updateConfig(name, value);
+
+  }
+
+  updateConfig(name, value) { 
+
+    if (!Object.keys(this.config).includes(name.split(".")[0])) {
       console.warn(`${name} is not a valid config parameter`);
       return;
+    }
+
+    if (name.includes(".")) {
+      const [groupKey, effectKey, valueKey] = name.split(".");
+      this.config = { ...this.config, [groupKey]: { ...this.config[groupKey],  effectKey: { ...this.config[groupKey][effectKey], [valueKey]: value }}}
     }
 
     this.config = { ...this.config, [name]: value };
@@ -72,6 +101,17 @@ export default class SynthBrain extends HTMLElement {
       if (this.audioSelection) {
         this.audioGrains = this.createGrains(this.audioSelection);
         document.querySelector("synth-slider[name='grainIndex']").setAttribute('max', this.audioGrains.length - 1);
+      }
+    }
+
+    if (name.includes('effects')) {
+      const [,effectKey, valueKey] = name.split(".");
+
+      if (value === 0) {
+        this.databender.updateConfig(effectKey, 'active', false);
+      } else {
+        this.databender.updateConfig(effectKey, 'active', true);
+        this.databender.updateConfig(effectKey, valueKey, value);
       }
     }
   }
@@ -113,6 +153,7 @@ export default class SynthBrain extends HTMLElement {
   }
 
   createGrains(sample) {
+
     const grainCount = Math.floor(sample.length / this.config.grainSize);
 
     const chunks = chunk(sample.getChannelData(0), grainCount);
@@ -185,7 +226,7 @@ export default class SynthBrain extends HTMLElement {
     let delta;
 
     const triggerImageGrain = () => {
-      const interval = Math.max(1000 / this.config.density, this.imageGrains[this.config.grainIndex].duration);
+      const interval = Math.max(1000 / this.config.density, this.imageGrains[this.config.grainIndex - 1].duration);
 
 
       now = Date.now();
@@ -198,7 +239,32 @@ export default class SynthBrain extends HTMLElement {
         const context = canvas.getContext("2d");
         context.clearRect(0, 0, canvas.width, canvas.height);
 
-        const grainBuffer = this.imageGrains[this.config.grainIndex];
+        if (this.config.grainIndex - 1 > this.imageGrains.length - 1) {
+          this.updateConfig('grainIndex', this.imageGrains.length - 1);
+        }
+
+
+        let indexToTrigger = this.config.grainIndex - 1;
+
+        const someRandomNumber = Math.random();
+        const shouldBeRandom = this.config.random > someRandomNumber;
+
+        if (shouldBeRandom) {
+          const min = this.config.grainIndex - this.config.spray;
+          const max = this.config.grainIndex + this.config.spray - 1;
+
+          indexToTrigger = Math.floor(Math.random() * (max - min)) + min;
+
+          if (indexToTrigger < 0) {
+            indexToTrigger = 0;
+          }
+
+          if (indexToTrigger > this.imageGrains.length - 1) {
+            indexToTrigger = this.imageGrains.length - 1;
+          }
+        } 
+
+        const grainBuffer = this.imageGrains[indexToTrigger];
 
         const windowedBuffer = this.applyWindowFunction(grainBuffer, hannWindow);
 
@@ -229,15 +295,44 @@ export default class SynthBrain extends HTMLElement {
 
     this.then = Date.now();
 
-    const triggerAudioGrain = () => {
-      const interval = Math.max(1000 / this.config.density, this.audioGrains[this.config.grainIndex].duration);
+    const triggerAudioGrain = async () => {
+      const interval = Math.max(1000 / this.config.density, this.audioGrains[this.config.grainIndex - 1].duration);
       now = Date.now();
       delta = now - this.then;
 
       if (delta > interval) {
-        const grainBuffer = this.audioGrains[this.config.grainIndex];
+        if (this.config.grainIndex - 1 > this.audioGrains.length - 1) {
+          this.updateConfig('grainIndex', this.audioGrains.length - 1);
+        }
+
+
+        let indexToTrigger = this.config.grainIndex - 1;
+
+        const someRandomNumber = Math.random();
+        const shouldBeRandom = this.config.random > someRandomNumber;
+
+        if (shouldBeRandom) {
       
-        const windowedBuffer = this.applyWindowFunction(grainBuffer, hannWindow);
+          const min = this.config.grainIndex - this.config.spray + 1;
+          const max = this.config.grainIndex + this.config.spray - 1;
+
+          indexToTrigger = Math.floor(Math.random() * (max - min)) + min;
+
+          if (indexToTrigger < 0) {
+            indexToTrigger = 0;
+          }
+
+          if (indexToTrigger > this.audioGrains.length - 1) {
+            indexToTrigger = this.audioGrains.length - 1;
+          }
+
+        } 
+
+        const grainBuffer = this.audioGrains[indexToTrigger];
+      
+        const effectedBuffer = await this.databender.render(grainBuffer);
+
+        const windowedBuffer = this.applyWindowFunction(effectedBuffer, hannWindow);
 
         this.bufferSource = this.audioCtx.createBufferSource();
         this.bufferSource.buffer = windowedBuffer;
@@ -253,10 +348,12 @@ export default class SynthBrain extends HTMLElement {
           });
           document.querySelector('synth-waveform').dispatchEvent(clearGrainEvent);
         };
+
+
         this.bufferSource.start(this.audioCtx.currentTime);
 
         const drawGrainEvent = new CustomEvent('draw-grain', {
-          detail: { grainIndex: this.config.grainIndex, grains: this.audioGrains},
+          detail: { grainIndex: indexToTrigger, grains: this.audioGrains},
           bubbles: true,
           composed: true,
         });
@@ -272,7 +369,7 @@ export default class SynthBrain extends HTMLElement {
       }
 
       this.audioScheduler = setTimeout(() => {
-        triggerAudioGrain(this.config.grainIndex);
+        triggerAudioGrain(this.config.grainIndex - 1);
       }, nextCall);
     };
 

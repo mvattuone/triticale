@@ -33,7 +33,7 @@ export default class SynthSlider extends HTMLElement {
 
 
     const updateConfigEvent = new CustomEvent("update-config", {
-      detail: { name, value: parseInt(value, 10) },
+      detail: { name, value: parseFloat(value, 10) },
       bubbles: true,
       composed: true,
     });
