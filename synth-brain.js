@@ -1,19 +1,6 @@
 import Databender from "databender";
-
-const chunk = (arr, chunkSize, cache = []) => {
-  const tmp = [...arr];
-  if (chunkSize <= 0) return cache;
-  while (tmp.length) cache.push(tmp.splice(0, chunkSize));
-  return cache;
-};
-
-function hannWindow(length, modifier) {
-    let window = new Float32Array(length);
-    for (let i = 0; i < length; i++) {
-        window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (modifier * (length - 1))));
-    }
-    return window;
-}
+import { chunk } from 'helpers/chunk.js';
+import { hannWindow } from 'helpers/hannWindow.js';
 
 export default class SynthBrain extends HTMLElement {
   constructor() {
@@ -56,7 +43,6 @@ export default class SynthBrain extends HTMLElement {
 
   connectedCallback() {
     this.addEventListener("image-uploaded", this.handleImageUploaded);
-    this.addEventListener("audio-uploaded", this.handleAudioUploaded);
     this.addEventListener("update-sample", this.updateAudioSelection);
     this.addEventListener("play-synth", this.playSynth);
     this.addEventListener("stop-synth", this.stopSynth);
@@ -65,7 +51,6 @@ export default class SynthBrain extends HTMLElement {
 
   disconnectedCallback() {
     this.removeEventListener("image-uploaded", this.handleImageUploaded);
-    this.removeEventListener("audio-uploaded", this.handleAudioUploaded);
     this.removeEventListener("update-sample", this.updateAudioSelection);
     this.removeEventListener("play-synth", this.playSynth);
     this.removeEventListener("stop-synth", this.stopSynth);
@@ -131,25 +116,12 @@ export default class SynthBrain extends HTMLElement {
   }
 
   handleImageUploaded(event) {
-    const imageData = event.detail;
+    const { image } = event.detail;
 
-    const img = new Image();
-    img.onload = () => {
-      this.image = img;
-      this.databender.convert(img).then((buffer) => {
-        // We need to figure out a way to separate the initial uploaded image
-        // OR we immediately display a grain version instead of the real thing?
-        this.imageBuffer = buffer;
-        this.imageGrains = this.createGrains(this.imageBuffer);
-        const updateImageEvent = new CustomEvent("update-image", {
-          detail: img,
-          bubbles: true,
-          composed: true,
-        });
-        this.querySelector("synth-display").dispatchEvent(updateImageEvent);
-      });
-    };
-    img.src = imageData;
+    this.databender.convert(image).then((buffer) => {
+      this.imageBuffer = buffer;
+      this.imageGrains = this.createGrains(this.imageBuffer);
+    });
   }
 
   createGrains(sample) {
