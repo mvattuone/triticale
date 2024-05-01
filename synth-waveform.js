@@ -23,20 +23,15 @@ export default class SynthWaveform extends HTMLElement {
   }
 
   connectedCallback() {
-    this.addEventListener("update-audio", this.handleAudioUploaded);
+    this.addEventListener("drop-success", this.handleAudioUploaded);
     this.addEventListener("clear-grain", this.clearGrain);
     this.addEventListener("draw-grain", this.drawGrain);
   }
 
   disconnectedCallback() {
-    this.removeEventListener("update-audio", this.handleAudioUploaded);
+    this.removeEventListener("drop-success", this.handleAudioUploaded);
     this.removeEventListener("clear-grain", this.clearGrain);
     this.removeEventListener("draw-grain", this.drawGrain);
-  }
-
-  handleAudioUploaded(event) {
-    const { buffer } = event.detail;
-    this.loadAudio(buffer);
   }
 
   pixelToSampleIndex(pixel) {
@@ -92,6 +87,28 @@ export default class SynthWaveform extends HTMLElement {
         this.canvas.height,
       );
     }
+  }
+
+  handleAudioUploaded(event) {
+    const { file } = event.detail;
+
+    if (!file.type.startsWith("audio/")) {
+      alert("File type not supported. Please upload an audio file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.audioCtx.decodeAudioData(
+        reader.result,
+        (buffer) => {
+          this.loadAudio(buffer);
+        },
+        (error) => {
+          console.error("Error decoding audio file:", error);
+        },
+      );
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   drawWaveform() {

@@ -9,6 +9,10 @@ class SynthDisplay extends HTMLElement {
                     max-width: 100%;
                     width: 100%;
                 }
+
+                canvas.hover {
+                  background-color: #efefef;
+                }
             </style>
             <canvas></canvas>
         `;
@@ -17,25 +21,42 @@ class SynthDisplay extends HTMLElement {
   }
 
   connectedCallback() {
-    this.addEventListener("update-image", this.handleImageUploaded, true);
-    console.log("Listener for update-image added.");
+    this.addEventListener("drop-success", this.handleImageUploaded, true);
   }
 
   disconnectedCallback() {
-    this.removeEventListener("update-image", this.handleImageUploaded, true);
-    console.log("Listener for update-image removed.");
+    this.removeEventListener("drop-success", this.handleImageUploaded, true);
   }
 
-  handleImageUploaded(event) {
-    const image = event.detail;
-    this.drawImage(image);
-  }
+  handleImageUploaded = (event) => {
+    const { file } = event.detail;
 
-  drawImage(img) {
-    this.canvas.width = img.width;
-    this.canvas.height = img.height;
+    if (!file.type.startsWith("image/")) {
+      alert("File type not supported. Please upload an image file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const image = new Image();
+      image.onload = () => {
+        const imageUploadedEvent = new CustomEvent('image-uploaded', {
+          detail: { image },
+          bubbles: true,
+          composed: true,
+        });
+        this.dispatchEvent(imageUploadedEvent);
+        this.drawImage(image);
+      };
+      image.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  drawImage(image) {
+    this.canvas.width = image.width;
+    this.canvas.height = image.height;
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.context.drawImage(img, 0, 0);
+    this.context.drawImage(image, 0, 0);
   }
 }
 
