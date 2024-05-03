@@ -209,7 +209,6 @@ export default class SynthBrain extends HTMLElement {
           .querySelector("synth-display")
           .shadowRoot.querySelector("canvas");
         const context = canvas.getContext("2d");
-        context.clearRect(0, 0, canvas.width, canvas.height);
 
         if (this.config.grainIndex - 1 > this.imageGrains.length - 1) {
           this.updateConfig('grainIndex', this.imageGrains.length - 1);
@@ -242,7 +241,8 @@ export default class SynthBrain extends HTMLElement {
 
         this.databender
           .render(windowedBuffer)
-          .then((buffer) =>
+          .then((buffer) => {
+            context.clearRect(0, 0, canvas.width, canvas.height);
             this.databender.draw(
               buffer,
               context,
@@ -254,8 +254,8 @@ export default class SynthBrain extends HTMLElement {
               this.databender.imageData.height / this.config.grainSize,
               canvas.width,
               canvas.height,
-            ),
-          );
+            )
+          });
 
         then = now - (delta % interval);
       }
