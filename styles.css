@@ -2,11 +2,21 @@ body {
   margin: 0;
 }
 
-.dropzone.hover {
-  background-color: cyan;
+header,
+main,
+footer {
+  background-color: pink;
 }
 
-label {
-  display: block;
-  text-align: center;
+header {
+  height: 50px;
 }
+
+main {
+
+}
+
+footer {
+  height: 30px;
+}
+
