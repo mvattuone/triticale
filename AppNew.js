@@ -1,5 +1,4 @@
 import './dnd-wrapper.js';
-import "./flex-box.js";
 import "./synth-brain.js";
 import "./synth-display.js";
 import "./synth-select.js";
