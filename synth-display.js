@@ -13,6 +13,8 @@ class SynthDisplay extends HTMLElement {
                 }
 
                 canvas {
+                  max-width: 100%;
+                }
 
 
             </style>
@@ -41,7 +43,7 @@ class SynthDisplay extends HTMLElement {
     reader.onload = (event) => {
       const image = new Image();
       image.onload = () => {
-        const imageUploadedEvent = new CustomEvent('image-uploaded', {
+        const imageUploadedEvent = new CustomEvent("image-uploaded", {
           detail: { image },
           bubbles: true,
           composed: true,

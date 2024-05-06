@@ -1,18 +1,16 @@
 export default class SynthToggle extends HTMLElement {
-
   constructor() {
     super();
 
-    const inputName = this.getAttribute('name');
-    const label = this.getAttribute('label');
-    const config = document.querySelector('synth-brain').config;
+    const inputName = this.getAttribute("name");
+    const label = this.getAttribute("label");
+    const config = document.querySelector("synth-brain").config;
     let value = config[inputName] || false;
 
     this.attachShadow({ mode: "open" });
 
-
     this.shadowRoot.innerHTML = `
-      ${label ? '<label for="${inputName}">${label}</label>' : ''}
+      ${label ? '<label for="${inputName}">${label}</label>' : ""}
       <input type="checkbox" name="${inputName}" checked="${value}" />
     `;
 
@@ -23,22 +21,18 @@ export default class SynthToggle extends HTMLElement {
   handleOnChange(e) {
     const { name, value } = e.target;
 
-
     const updateConfigEvent = new CustomEvent("update-config", {
       detail: { name, value: parseFloat(value, 10) },
       bubbles: true,
       composed: true,
     });
 
-    document
-      .querySelector("synth-brain")
-      .dispatchEvent(updateConfigEvent);
+    document.querySelector("synth-brain").dispatchEvent(updateConfigEvent);
   }
 
   connectedCallback() {
-    this.inputElement.addEventListener('input', this.handleOnChange);
+    this.inputElement.addEventListener("input", this.handleOnChange);
   }
 }
 
 customElements.define("synth-toggle", SynthToggle);
-

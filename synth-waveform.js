@@ -81,8 +81,13 @@ export default class SynthWaveform extends HTMLElement {
       this.selectionToPixels.end !== null
     ) {
       this.context.fillStyle = "rgba(0, 100, 255, 0.3)";
-      this.selectionX = Math.min(this.selectionToPixels.start, this.selectionToPixels.end),
-      this.selectionWidth = Math.abs(this.selectionToPixels.end - this.selectionToPixels.start)
+      (this.selectionX = Math.min(
+        this.selectionToPixels.start,
+        this.selectionToPixels.end,
+      )),
+        (this.selectionWidth = Math.abs(
+          this.selectionToPixels.end - this.selectionToPixels.start,
+        ));
       this.context.fillRect(
         Math.min(this.selectionToPixels.start, this.selectionToPixels.end),
         0,

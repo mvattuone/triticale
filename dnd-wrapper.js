@@ -1,7 +1,7 @@
 export default class DndWrapper extends HTMLElement {
   constructor() {
-    super(); 
-    this.attachShadow({ mode: "open" }); 
+    super();
+    this.attachShadow({ mode: "open" });
   }
 
   connectedCallback() {
@@ -24,7 +24,7 @@ export default class DndWrapper extends HTMLElement {
 
   handleDragOver(e) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy"; 
+    e.dataTransfer.dropEffect = "copy";
     this.dropzone.classList.add("dropping");
   }
 
@@ -38,11 +38,13 @@ export default class DndWrapper extends HTMLElement {
     this.dropzone.classList.remove("dropping");
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-        this.dropzone.dispatchEvent(new CustomEvent('drop-success', {
-         detail: { file: files[0] },
-      bubbles: true,
-      composed: true
-  }));
+      this.dropzone.dispatchEvent(
+        new CustomEvent("drop-success", {
+          detail: { file: files[0] },
+          bubbles: true,
+          composed: true,
+        }),
+      );
     }
   }
 }

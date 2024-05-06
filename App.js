@@ -1,4 +1,4 @@
-import './dnd-wrapper.js';
+import "./dnd-wrapper.js";
 import "./synth-brain.js";
 import "./synth-display.js";
 import "./synth-select.js";
