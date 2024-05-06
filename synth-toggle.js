@@ -12,10 +12,8 @@ export default class SynthToggle extends HTMLElement {
 
 
     this.shadowRoot.innerHTML = `
-      <div>
-        ${label ? '<label for="${inputName}">${label}</label>' : ''}
-        <input type="checkbox" name="${inputName}" checked="${value}" />
-      </div>
+      ${label ? '<label for="${inputName}">${label}</label>' : ''}
+      <input type="checkbox" name="${inputName}" checked="${value}" />
     `;
 
     this.inputElement = this.shadowRoot.querySelector('input[type="checkbox"]');

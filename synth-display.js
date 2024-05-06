@@ -4,15 +4,17 @@ class SynthDisplay extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
             <style>
-                canvas {
+                :host {
+                    box-sizing: border-box;
                     border: 1px solid black;
-                    max-width: 100%;
-                    width: 100%;
+                    display: block;
+                    height: 500px;
+                    width: 500px;
                 }
 
-                canvas.hover {
-                  background-color: #efefef;
-                }
+                canvas {
+
+
             </style>
             <canvas></canvas>
         `;

@@ -4,8 +4,11 @@ export default class SynthWaveform extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
             <style>
-                canvas {
+                :host {
                     border: 1px solid black;
+                    display: block;
+                    height: 300px;
+                    width: 1000px;
                 }
             </style>
             <canvas></canvas>
