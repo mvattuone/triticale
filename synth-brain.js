@@ -78,6 +78,8 @@ export default class SynthBrain extends HTMLElement {
 
     this.config = { ...this.config, [name]: value };
 
+    
+
     if (name === 'grainSize') {
       if (this.imageBuffer) {
         this.imageGrains = this.createGrains(this.imageBuffer);
@@ -314,14 +316,14 @@ export default class SynthBrain extends HTMLElement {
       let expectedTime = performance.now() + interval;
 
       const runner = () => {
+        const interval = 1000 / this.config.density;
         const drift = performance.now() - expectedTime;
-        console.log('drift is ', drift);
         callback();
         expectedTime += interval;
-        setTimeout(runner, Math.max(0, interval - drift)); 
+        setTimeout(runner.bind(this), Math.max(0, interval - drift)); 
       };
 
-      setTimeout(runner, interval);
+      setTimeout(runner.bind(this), interval);
     };
 
     if (this.imageGrains.length > 0) {
