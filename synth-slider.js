@@ -16,11 +16,9 @@ export default class SynthSlider extends HTMLElement {
 
 
     this.shadowRoot.innerHTML = `
-      <div>
         <label for="${inputName}">${label}</label>
         <input type="range" name="${inputName}" min="${min}" max="${max}" value="${value}" step="${step}" />
         <span>${value}</span>
-      </div>
     `;
 
     this.displayValue = this.shadowRoot.querySelector('span');
