@@ -8,8 +8,8 @@ class SynthDisplay extends HTMLElement {
                     box-sizing: border-box;
                     border: 1px solid black;
                     display: block;
-                    height: 500px;
-                    width: 500px;
+                    height: 450px;
+                    width: 800px;
                 }
 
                 canvas {
