@@ -15,9 +15,48 @@ export default class SynthSlider extends HTMLElement {
     this.attachShadow({ mode: "open" });
 
     this.shadowRoot.innerHTML = `
-        <label for="${inputName}">${label}</label>
-        <input type="range" name="${inputName}" min="${min}" max="${max}" value="${value}" step="${step}" />
+        <style>
+         :host  {
+           align-items: center;
+           display: inline-flex;
+           flex-direction: column;
+         }
+
+          input[type="range"] {
+              appearance: slider-vertical;
+              width: 8px;
+              height: 100%;
+          }
+
+          /* Style the track */
+          input[type="range"]::-webkit-slider-runnable-track,
+          input[type="range"]::-moz-range-track,
+          input[type="range"]::-ms-track {
+              background: #ddd; /* Light grey track */
+              border-radius: 5px;
+          }
+
+          /* Style the thumb */
+          input[type="range"]::-webkit-slider-thumb,
+          input[type="range"]::-moz-range-thumb,
+          input[type="range"]::-ms-thumb {
+              -webkit-appearance: none;
+              height: 20px;
+              width: 20px;
+              border-radius: 50%;
+              background: black;
+              cursor: pointer; /* Makes the thumb appear clickable */
+              margin-top: -6px; /* Aligns the thumb with the track */
+          }
+
+          /* Add focus styles for accessibility */
+          input[type="range"]:focus {
+              outline: none;
+          }
+        </style>
         <span>${value}</span>
+        <input type="range" name="${inputName}" min="${min}" max="${max}" value="${value}" step="${step}" />
+        <label for="${inputName}">${label}</label>
     `;
 
     this.displayValue = this.shadowRoot.querySelector("span");
