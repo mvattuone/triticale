@@ -66,13 +66,17 @@ export default class SynthWaveform extends HTMLElement {
       this.selection.end = this.pixelToSampleIndex(x);
       this.drawWaveform();
       this.drawSelection();
-      const updateSampleEvent = new CustomEvent("update-sample", {
-        detail: { selection: this.selection, buffer: this.buffer },
-        bubbles: true,
-        composed: true,
-      });
-      this.dispatchEvent(updateSampleEvent);
+      this.updateSample();
     });
+  }
+
+  updateSample() {
+    const updateSampleEvent = new CustomEvent("update-sample", {
+      detail: { selection: this.selection, buffer: this.buffer },
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(updateSampleEvent);
   }
 
   drawSelection() {
@@ -122,10 +126,6 @@ export default class SynthWaveform extends HTMLElement {
   drawWaveform() {
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    this.samplesPerPixel = Math.floor(
-      this.channelData.length / this.canvas.width,
-    );
-
     for (var i = 0; i < this.channelData.length; i += this.samplesPerPixel) {
       var x = Math.floor((this.canvas.width * i) / this.channelData.length);
       var y = (this.channelData[i] * this.canvas.height) / 2;
@@ -162,7 +162,16 @@ export default class SynthWaveform extends HTMLElement {
     this.channelData = channel;
     this.canvas.width = 1000;
     this.canvas.height = 300;
+    this.samplesPerPixel = Math.floor(
+      this.channelData.length / this.canvas.width,
+    );
+    this.selectionToPixels.start = 0;
+    this.selectionToPixels.end = this.canvas.width;
+    this.selection.start = this.pixelToSampleIndex(this.selectionToPixels.start);
+    this.selection.end = this.pixelToSampleIndex(this.selectionToPixels.end);
     this.drawWaveform();
+    this.drawSelection();
+    this.updateSample();
   }
 }
 
