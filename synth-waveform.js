@@ -7,16 +7,16 @@ export default class SynthWaveform extends HTMLElement {
                 :host {
                     border: 1px solid black;
                     display: block;
-                    height: 300px;
-                    width: 1000px;
+                    height: 150px;
+                    width: 800px;
                 }
             </style>
             <canvas></canvas>
         `;
     this.canvas = this.shadowRoot.querySelector("canvas");
     this.context = this.canvas.getContext("2d");
-    this.canvas.width = 1000;
-    this.canvas.height = 300;
+    this.canvas.width = 800;
+    this.canvas.height = 150;
     this.selection = { start: null, end: null };
     this.selectionToPixels = { start: null, end: null };
     this.selectionWidth = this.canvas.width;
@@ -160,8 +160,6 @@ export default class SynthWaveform extends HTMLElement {
     this.buffer = buffer;
     const channel = buffer.getChannelData(0);
     this.channelData = channel;
-    this.canvas.width = 1000;
-    this.canvas.height = 300;
     this.samplesPerPixel = Math.floor(
       this.channelData.length / this.canvas.width,
     );

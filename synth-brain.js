@@ -28,7 +28,7 @@ export default class SynthBrain extends HTMLElement {
         }
       },
       grainIndex: 1,
-      grainSize: 10,
+      grainDuration: 50,
       density: 1,
       window: 1,
       spray: 1,
@@ -80,14 +80,13 @@ export default class SynthBrain extends HTMLElement {
 
     
 
-    if (name === 'grainSize') {
+    if (name === 'grainDuration') {
       if (this.imageBuffer) {
         this.imageGrains = this.createGrains(this.imageBuffer);
       }
 
       if (this.audioSelection) {
         this.audioGrains = this.createGrains(this.audioSelection);
-        document.querySelector("synth-slider[name='grainIndex']").setAttribute('max', this.audioGrains.length - 1);
       }
     }
 
@@ -127,10 +126,12 @@ export default class SynthBrain extends HTMLElement {
   }
 
   createGrains(sample) {
+    const totalDurationSeconds = sample.duration;
+    const totalDurationMs = totalDurationSeconds * 1000;
+    this.numberOfGrains = Math.floor(totalDurationMs / this.config.grainDuration);
 
-    const grainCount = Math.floor(sample.length / this.config.grainSize);
-
-    const chunks = chunk(sample.getChannelData(0), grainCount);
+    this.samplesPerGrain = Math.floor(sample.length / this.numberOfGrains);
+    const chunks = chunk(sample.getChannelData(0), this.samplesPerGrain);
 
     const grains = chunks.map((chunk) => {
       const grainBuffer = this.audioCtx.createBuffer(
@@ -241,7 +242,7 @@ export default class SynthBrain extends HTMLElement {
           0,
           0,
           this.databender.imageData.width,
-          this.databender.imageData.height / this.config.grainSize,
+          this.databender.imageData.height / this.numberOfGrains,
           canvas.width,
           canvas.height,
         )
