@@ -8,10 +8,20 @@ export default class SynthWaveform extends HTMLElement {
                     border: 1px solid black;
                     display: block;
                     height: 150px;
+                    position: relative;
                     width: 800px;
+                }
+
+                p {
+                  position: absolute;
+                  transform: translate(-50%, -50%);
+                  left: 50%;
+                  top: 50%;
+                  margin: 0;
                 }
             </style>
             <canvas></canvas>
+            <p>Drop audio here</p>
         `;
     this.canvas = this.shadowRoot.querySelector("canvas");
     this.context = this.canvas.getContext("2d");

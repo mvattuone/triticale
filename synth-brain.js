@@ -291,8 +291,6 @@ export default class SynthBrain extends HTMLElement {
   this.bufferSource.connect(this.audioCtx.destination);
 
   this.bufferSource.onended = () => {
-    this.bufferSource.stop();
-    this.bufferSource.disconnect();
     const clearGrainEvent = new Event('clear-grain', {
       bubbles: true,
       composed: true,
@@ -301,7 +299,7 @@ export default class SynthBrain extends HTMLElement {
   };
 
 
-  this.bufferSource.start(0);
+  this.bufferSource.start(this.audioCtx.currentTime);
 
   const drawGrainEvent = new CustomEvent('draw-grain', {
     detail: { grainIndex: indexToTrigger, grains: this.audioGrains},
