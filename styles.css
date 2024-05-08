@@ -9,7 +9,6 @@ body {
 header,
 main,
 footer {
-  background-color: pink;
 }
 
 header {
@@ -19,7 +18,9 @@ header {
 main {
   border: 1px solid black;
   display: flex;
-  flex-direction: column;
+}
+
+section {
 }
 
 footer {
