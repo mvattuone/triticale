@@ -11,20 +11,31 @@ export default class SynthBrain extends HTMLElement {
     this.imageGrains = [];
     this.config = {
       effects: {
+        biquad: {
+          active: false,
+          areaOfEffect: 1,
+          biquadFrequency: 8500,
+          detune: 0,
+          enablePartial: false,
+          quality: 1,
+          randomValues: 2,
+          randomize: false,
+          type: "lowpass",
+        },
         bitcrusher: {
+          active: true,
           bits: 4,
           bufferSize: 4096,
           normfreq: 0.1,
-          active: true,
         },
         convolver: {
-          highCut: 22050,
-          lowCut: 20,
-          dryLevel: 1,
-          wetLevel: 1, 
           active: true,
-          level: 1,
+          dryLevel: 1,
+          highCut: 22050,
           impulse: 'minster1_000_ortf_48k.wav',
+          level: 1,
+          lowCut: 20,
+          wetLevel: 1, 
         }
       },
       grainIndex: 1,
@@ -73,12 +84,10 @@ export default class SynthBrain extends HTMLElement {
 
     if (name.includes(".")) {
       const [groupKey, effectKey, valueKey] = name.split(".");
-      this.config = { ...this.config, [groupKey]: { ...this.config[groupKey],  effectKey: { ...this.config[groupKey][effectKey], [valueKey]: value }}}
+      this.config = { ...this.config, [groupKey]: { ...this.config[groupKey],  [effectKey]: { ...this.config[groupKey][effectKey], [valueKey]: value }}}
+    } else {
+      this.config = { ...this.config, [name]: value };
     }
-
-    this.config = { ...this.config, [name]: value };
-
-    
 
     if (name === 'grainDuration') {
       if (this.imageBuffer) {
@@ -92,13 +101,7 @@ export default class SynthBrain extends HTMLElement {
 
     if (name.includes('effects')) {
       const [,effectKey, valueKey] = name.split(".");
-
-      if (value === 0) {
-        this.databender.updateConfig(effectKey, 'active', false);
-      } else {
-        this.databender.updateConfig(effectKey, 'active', true);
-        this.databender.updateConfig(effectKey, valueKey, value);
-      }
+      this.databender.updateConfig(effectKey, valueKey, value);
     }
   }
 

@@ -90,10 +90,49 @@
             name="effects.convolver.level"
             label="Level"
           ></synth-slider>
+          <!-- <synth-select -->
+          <!--   name="effects.convolver.impulse" -->
+          <!--   label="Type" -->
+          <!--   options=" -->
+          <!-- ></synth-select> -->
+        </section>
+        <section>
+          <h4>Biquad</h4>
+          <synth-toggle name="effects.biquad.active"></synth-toggle>
+          <synth-slider
+            min="0"
+            max="1"
+            step="0.01"
+            name="effects.biquad.areaOfEffect"
+            label="Area Of Effect"
+          ></synth-slider>
+          <synth-slider
+            name="effects.biquad.detune"
+            label="Detune"
+          ></synth-slider>
+          <synth-slider
+            name="effects.biquad.quality"
+            label="Quality"
+          ></synth-slider>
+          <synth-slider
+            name="effects.biquad.randomValues"
+            label="Random Values"
+          ></synth-slider>
           <synth-select
-            name="effects.convolver.impulse"
+            name="effects.biquad.type"
             label="Type"
+          options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
           ></synth-select>
+          <synth-slider label="Frequency" name="effects.biquad.biquadFrequency"
+></synth-slider>
+          <div>
+            <label>Randomize</label>
+            <synth-toggle name="effects.biquad.randomize"></synth-toggle>
+          </div>
+          <div>
+            <label>Enable Partial</label>
+            <synth-toggle name="effects.biquad.enablePartial"></synth-toggle>
+          </div>
         </section>
         <play-button></play-button>
       </main>

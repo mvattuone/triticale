@@ -3,14 +3,7 @@ export default class SynthSelect extends HTMLElement {
     super();
 
     const selectName = this.getAttribute("name");
-    const options = [
-      "blackman",
-      "gaussian",
-      "hann",
-      "hamming",
-      "triangle",
-      "none",
-    ];
+    const options = this.getAttribute("options");
 
     this.attachShadow({ mode: "open" });
 
