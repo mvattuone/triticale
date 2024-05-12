@@ -10,7 +10,17 @@ export default class SynthSlider extends HTMLElement {
     const label = this.getAttribute("label");
     const step = this.getAttribute("step");
     const config = document.querySelector("synth-brain").config;
-    let value = config[inputName] || 0;
+
+
+    let value;
+
+    if (inputName.includes(".")) {
+      const [groupKey, effectKey, valueKey] = inputName.split(".");
+      value = config[groupKey][effectKey][valueKey] || 0;
+    } else {
+      value = config[inputName] || 0;
+    }
+
 
     this.attachShadow({ mode: "open" });
 
