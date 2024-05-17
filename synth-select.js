@@ -3,13 +3,13 @@ export default class SynthSelect extends HTMLElement {
     super();
 
     const selectName = this.getAttribute("name");
-    const options = this.getAttribute("options");
+    const options = JSON.parse(this.getAttribute("options"));
 
     this.attachShadow({ mode: "open" });
 
     this.shadowRoot.innerHTML = `
       <select name="${selectName}">
-        ${options.map((option) => `<option value=${option}>${option}</option>`)}
+        ${options.map(({ label, value }) => `<option value=${value}>${label}</option>`)}
       </select>
     `;
 

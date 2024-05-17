@@ -110,10 +110,10 @@
             name="effects.biquad.detune"
             label="Detune"
           ></synth-slider>
-          <synth-slider
+          <synth-quslider
             name="effects.biquad.quality"
             label="Quality"
-          ></synth-slider>
+          ></synth-quslider>
           <synth-slider
             name="effects.biquad.randomValues"
             label="Random Values"
@@ -121,9 +121,9 @@
           <synth-select
             name="effects.biquad.type"
             label="Type"
-          options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
+            options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
           ></synth-select>
-          <synth-slider label="Frequency" name="effects.biquad.biquadFrequency"
+          <synth-slider min="20" max="44000" label="Frequency" name="effects.biquad.biquadFrequency"
 ></synth-slider>
           <div>
             <label>Randomize</label>
