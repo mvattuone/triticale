@@ -4,6 +4,21 @@
     <meta charset="utf-8" />
     <title>Webaudio Databending</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/png" />
+    <script>
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const context = canvas.getContext('2d');
+      context.fillStyle = 'pink';
+
+      context.fillRect(0, 0, 16, 16);
+
+      const favicon = canvas.toDataURL('image/png');
+
+      document.querySelector('link[rel="icon"]').setAttribute('href', favicon);
+
+    </script>
   </head>
   <body>
     <header>Triticale</header>

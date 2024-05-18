@@ -60,6 +60,7 @@ class SynthDisplay extends HTMLElement {
         });
         this.dispatchEvent(imageUploadedEvent);
         this.drawImage(image);
+        document.querySelector('link[rel="icon"]').setAttribute('href', image.src);
       };
       image.src = event.target.result;
     };

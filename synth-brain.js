@@ -249,6 +249,9 @@ export default class SynthBrain extends HTMLElement {
           canvas.width,
           canvas.height,
         )
+    
+        document.querySelector('link[rel="icon"]').setAttribute('href', canvas.toDataURL('image/png'));
+
       });
 };
 
