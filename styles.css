@@ -4,23 +4,97 @@
 
 body {
   margin: 0;
-}
-
-header,
-main,
-footer {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  background: #111417;
+  color: #f1f4f3;
 }
 
 header {
   height: 50px;
 }
 
-main {
-  border: 1px solid black;
-  display: flex;
+main  {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 2fr 4fr 2fr;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 30vh);
+  height: calc(100vh - 50px);
 }
 
-section {
+@supports (height: 100dvh) {
+  main { height: calc(100dvh - 50px); }
+}
+
+#granulation {
+  display: flex;
+  flex-direction: column;
+}
+
+#visuals {
+  display: flex;
+  flex-direction: column;;
+}
+
+synth-display { 
+  flex-grow: 2;
+  flex-shrink: 1;
+}
+
+synth-waveform {
+  flex-grow: 1;
+  flex-shrink: 2;
+}
+
+#granulation > dnd-wrapper {
+  display: flex;
+  flex: 1 1 auto;
+}
+
+#granulation > dnd-wrapper synth-waveform {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#effects {
+  display: flex;
+  flex-direction: column;
+}
+
+#bottom {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px;
+  min-height: 0;
+}
+
+#bottom > div {
+  align-items: center;
+  display: flex;
+  padding: 0 40px;
+}
+
+play-button {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 24px;
+}
+
+synth-ribbon { 
+  flex-grow: 8;
+  flex-shrink: 1;
+}
+
+#bottom dnd-wrapper {
+  display: flex;
+  min-height: 0;
+}
+
+#bottom dnd-wrapper synth-waveform {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 footer {
