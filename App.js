@@ -9,5 +9,6 @@ import "./synth-switch.js";
 import "./synth-waveform.js";
 import "./play-button.js";
 import "./synth-ribbon.js";
+import "./synth-joystick.js";
 
 export function App() {}

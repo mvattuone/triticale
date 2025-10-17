@@ -4,6 +4,21 @@ import { chunk } from 'helpers/chunk.js';
 import { hannWindow } from 'helpers/hannWindow.js';
 import { ensureBoxSizing } from 'helpers/boxSizing.js';
 
+function random(x, y) {
+ return x+(y-x+1)*crypto.getRandomValues(new Uint32Array(1))[0]/2**32|0
+};
+
+const loadBitcrusherModule = (() => {
+  const loadedOn = new WeakSet();
+  return async (context) => {
+    if (!context?.audioWorklet || loadedOn.has(context)) {
+      return;
+    }
+    await context.audioWorklet.addModule(new URL('effects/bitcrusher.js', import.meta.url));
+    loadedOn.add(context);
+  };
+})();
+
 export default class SynthBrain extends HTMLElement {
   constructor() {
     super();
@@ -14,32 +29,32 @@ export default class SynthBrain extends HTMLElement {
     this.config = {
       effects: {
         delay: {
-          active: true,
+          active: false,
           feedback: 0.6,
           time: 0.4,
           mix: 0.5,
         },
-        lowPassFilter: {
-          active: true,
-          frequency: 1200,
-          peak: 10,
-          mix: 0.4,
+        bitcrusher: {
+          active: false,
+          bits: 8,
+          bufferSize: 4096,
+          normfreq: 0.1,
         },
         detune: {
-          active: false,
+          active: true,
           value: 0,
           randomize: false,
           randomValues: 4,
           enablePartial: false,
           areaOfEffect: 0.5,
         },
-        biquadFilter: {
+        biquad: {
           active: false,
           areaOfEffect: 1,
           biquadFrequency: 8500,
           detune: 0,
           enablePartial: false,
-          quality: 1,
+          quality: 0,
           randomValues: 2,
           randomize: false,
           type: "lowpass",
@@ -56,13 +71,10 @@ export default class SynthBrain extends HTMLElement {
       {
         config: this.config.effects,
         effectsChain: [
+          this.usePizzicatoEffect(Pizzicato.Effects.Delay, () => this.getEffectOptions("delay")),
+          async (payload) => this.bitcrusherFactory(payload),
           (payload) => this.detune(payload),
           (payload) => this.biquadFilter(payload),
-          this.usePizzicatoEffect(Pizzicato.Effects.Delay, () => this.getEffectOptions("delay")),
-          this.usePizzicatoEffect(
-            Pizzicato.Effects.LowPassFilter,
-            () => this.getEffectOptions("lowPassFilter"),
-          ),
         ],
       },
       this.audioCtx,
@@ -100,93 +112,128 @@ export default class SynthBrain extends HTMLElement {
     this.removeEventListener("audio-cleared", this.handleAudioCleared);
   }
 
+
+  bitcrusherFactory = async (payload) => {
+    const { context, config } = payload;
+    await loadBitcrusherModule(context);
+    return this.bitcrusher({ context, config }); // your existing constructor
+  };
+
   handleUpdateConfig(e) {
     const { name, value } = e.detail;
 
     return this.updateConfig(name, value);
   }
 
-  biquadFilter({ context, source, config }) {
-    const opts = config?.biquadFilter;
-    if (!opts?.active) {
+  bitcrusher({ context, config }) {
+    const options = (config && config.bitcrusher)
+      ? config.bitcrusher
+      : this.getEffectOptions('bitcrusher');
+    if (!options?.active) {
       return null;
     }
 
-    const filter = context.createBiquadFilter();
-    filter.type = opts.type ?? 'lowpass';
+    const rawBits = Number(options.bits);
+    const normalizedBits = Number.isFinite(rawBits) ? rawBits : 8;
+    const bitsValue = Math.max(1, Math.min(16, Math.round(normalizedBits)));
 
-    const duration = source.buffer?.duration ?? 0;
-    const startTime = context.currentTime;
-    const rawFrequency = Number(opts.biquadFrequency ?? opts.frequency);
-    const targetFrequency = Number.isFinite(rawFrequency) ? Math.max(0, rawFrequency) : 200;
-    const rawDetune = Number(opts.detune);
-    const detuneValue = Number.isFinite(rawDetune) ? rawDetune : 0;
-    const area = Math.max(0, Number(opts.areaOfEffect) || 0);
-    const randomPoints = Math.max(0, Math.floor(Number(opts.randomValues) || 0));
+    const rawNormfreq = Number(options.normfreq);
+    const normalizedNormfreq = Number.isFinite(rawNormfreq) ? rawNormfreq : 0.1;
+    const normfreqValue = Math.max(0.0001, Math.min(1, normalizedNormfreq));
 
-    filter.frequency.cancelScheduledValues(0);
-    filter.detune.cancelScheduledValues(0);
+    const node = new AudioWorkletNode(context, 'bitcrusher', {
+      parameterData: {
+        bits: bitsValue,
+        normfreq: normfreqValue,
+      },
+    });
 
-    if (opts.randomize && randomPoints > 1 && duration > 0) {
-      const curve = new Float32Array(randomPoints);
-      for (let index = 0; index < randomPoints; index++) {
-        curve[index] = Math.random() * targetFrequency;
-      }
-      filter.frequency.setValueCurveAtTime(curve, startTime, duration);
-      filter.detune.setValueCurveAtTime(curve, startTime, duration);
-    } else if (opts.enablePartial) {
-      const epsilon = Math.max(area, 0.0001);
-      filter.frequency.setTargetAtTime(targetFrequency, startTime + area, epsilon);
-      filter.detune.setTargetAtTime(detuneValue, startTime + area, epsilon);
-    } else {
-      filter.frequency.setValueAtTime(targetFrequency, startTime);
-      filter.detune.setValueAtTime(detuneValue, startTime);
+    const bitsParam = node.parameters?.get('bits');
+    const normfreqParam = node.parameters?.get('normfreq');
+    const currentTime = typeof context.currentTime === 'number' ? context.currentTime : 0;
+
+    if (bitsParam) {
+      bitsParam.setValueAtTime(bitsValue, currentTime);
     }
 
-    const rawQuality = Number(opts.quality);
-    filter.Q.value = Number.isFinite(rawQuality) ? rawQuality : 1;
+    if (normfreqParam) {
+      normfreqParam.setValueAtTime(normfreqValue, currentTime);
+    }
 
-    return filter;
+    return { input: node, output: node };
   }
 
-  detune({ config, source, context }) {
-    const opts = config?.detune;
-    const audioParam = source?.detune;
-    if (!audioParam) {
-      return null;
+
+  applyBitcrusherVisuals(buffer) {
+    const effectConfig = this.config?.effects?.bitcrusher;
+    if (!effectConfig?.active) {
+      return;
     }
 
-    const currentTime = context?.currentTime ?? 0;
-
-    audioParam.cancelScheduledValues(0);
-
-    if (!opts?.active) {
-      audioParam.setValueAtTime(0, currentTime);
-      return null;
+    const channelData = buffer?.getChannelData?.(0);
+    if (!channelData) {
+      return;
     }
 
-    const duration = source.buffer?.duration ?? 0;
+    const bits = Math.max(1, Math.min(16, Math.round(Number(effectConfig.bits) || 8)));
+    const normfreq = Math.max(0.0001, Math.min(1, Number(effectConfig.normfreq) || 0.1));
+    const step = Math.pow(0.5, bits);
+    let phaser = 0;
+    let lastNormalized = 0;
 
-    if (opts.randomize && opts.randomValues > 1 && duration > 0) {
-      const pointCount = Math.max(2, Math.floor(Number(opts.randomValues)));
-      const curve = new Float32Array(pointCount);
-      const min = 0.0001;
-      const max = 400;
-      for (let index = 0; index < pointCount; index++) {
-        curve[index] = Math.random() * (max - min) + min;
+    for (let index = 0; index < channelData.length; index++) {
+      const normalizedSample = Math.max(0, Math.min(1, channelData[index] / 255));
+      phaser += normfreq;
+      if (phaser >= 1.0) {
+        phaser -= 1.0;
+        lastNormalized = step * Math.floor(normalizedSample / step + 0.5);
       }
-      audioParam.setValueCurveAtTime(curve, currentTime, duration);
-      return null;
+      channelData[index] = Math.max(0, Math.min(255, lastNormalized * 255));
     }
+  }
 
-    if (opts.enablePartial) {
-      const area = Math.max(0, Number(opts.areaOfEffect) || 0);
-      const epsilon = Math.max(area, 0.0001);
-      audioParam.setTargetAtTime(Number(opts.value ?? 0), currentTime + area, epsilon);
-      return null;
+
+
+  biquadFilter({ config, context, source }) {
+     if (config.biquad.randomize) {
+    var waveArray = new Float32Array(config.biquad.randomValues);
+    for (let i=0;i<config.biquad.randomValues;i++) {
+      waveArray[i] = random(0.0001, config.biquad.biquadFrequency); 
     }
+  }
+  var biquadFilter = context.createBiquadFilter();
+  biquadFilter.type = config.biquad.type;
+  if (config.biquad.randomize) {
+    biquadFilter.frequency.cancelScheduledValues(0);
+    biquadFilter.frequency.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
+    biquadFilter.detune.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
+  } else if (config.biquad.enablePartial) {
+    biquadFilter.frequency.cancelScheduledValues(0);
+    biquadFilter.frequency.setTargetAtTime(config.biquad.biquadFrequency, config.biquad.areaOfEffect, config.biquad.areaOfEffect);
+  } else {
+    biquadFilter.frequency.cancelScheduledValues(0);
+    biquadFilter.frequency.value = config.biquad.biquadFrequency;
+  };
+  biquadFilter.Q.value = config.biquad.quality;
+  biquadFilter.detune.cancelScheduledValues(0);
+  biquadFilter.detune.value = config.biquad.detune;
+  return biquadFilter;
+  }
 
-    audioParam.setValueAtTime(Number(opts.value ?? 0), currentTime);
+  detune({ config, source, }) {
+    if (config.detune.randomize) {
+      var waveArray = new Float32Array(config.detune.randomValues);
+      for (let i=0;i<config.detune.randomValues;i++) {
+        waveArray[i] = random(0.0001, 400); 
+      }
+
+      source.detune.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
+    } else if (config.detune.enablePartial) {
+      source.detune.setTargetAtTime(config.detune.value, config.detune.areaOfEffect, config.detune.areaOfEffect);
+    } else {
+      source.detune.value = config.detune.value;
+    };
+      
     return null;
   }
 
@@ -614,6 +661,7 @@ export default class SynthBrain extends HTMLElement {
     this.databender
       .render(grainBuffer)
       .then((buffer) => {
+        this.applyBitcrusherVisuals(buffer);
         context.clearRect(0, 0, canvas.width, canvas.height);
         this.databender.draw(
           buffer,
