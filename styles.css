@@ -1,48 +1,67 @@
-* {
+:host *, * {
   box-sizing: border-box;
 }
+
+h4 { margin: 0; }
 
 body {
   margin: 0;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   background: #111417;
   color: #f1f4f3;
-}
-
-header {
-  height: 50px;
+  height: 100vh;
 }
 
 main  {
   display: grid;
-  gap: 24px;
-  grid-template-columns: 2fr 4fr 2fr;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 30vh);
-  height: calc(100vh - 50px);
+  height: 100vh;
+  padding: 24px;
+  grid-template-columns: 1fr 3fr 1fr; 
+  grid-template-rows: minmax(0, 4fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "granulation display effects"
+    ". waveform ."
+    "bottom bottom bottom";
 }
 
 @supports (height: 100dvh) {
-  main { height: calc(100dvh - 50px); }
+  main { 
+    height: 100dvh;
+    grid-template-rows: minmax(0, 4fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
 }
 
 #granulation {
   display: flex;
   flex-direction: column;
+  grid-area: granulation;
+  gap: 12px;
 }
 
 #visuals {
   display: flex;
   flex-direction: column;;
+  grid-area: visuals;
+}
+
+#effects {
+  display: flex;
+  flex-direction: column;
+  grid-area: effects;
+  gap: 12px;
+}
+
+#bottom {
+  grid-area: bottom;
 }
 
 synth-display { 
-  flex-grow: 2;
-  flex-shrink: 1;
+  grid-area: display;
 }
 
 synth-waveform {
-  flex-grow: 1;
-  flex-shrink: 2;
+  grid-area: waveform;
 }
 
 #granulation > dnd-wrapper {
@@ -52,26 +71,26 @@ synth-waveform {
 
 #granulation > dnd-wrapper synth-waveform {
   flex: 1 1 auto;
-  min-height: 0;
 }
 
-#effects {
+.synth-effect {
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
-#bottom {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 16px;
-  min-height: 0;
+.synth-controls {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 12px;
 }
 
 #bottom > div {
   align-items: center;
   display: flex;
   padding: 0 40px;
+  height: 100%;
 }
 
 play-button {
@@ -89,12 +108,10 @@ synth-ribbon {
 
 #bottom dnd-wrapper {
   display: flex;
-  min-height: 0;
 }
 
 #bottom dnd-wrapper synth-waveform {
   flex: 1 1 auto;
-  min-height: 0;
 }
 
 footer {

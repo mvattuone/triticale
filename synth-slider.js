@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 export default class SynthSlider extends HTMLElement {
   static observedAttributes = ["min", "max"];
   constructor() {
@@ -182,6 +184,8 @@ export default class SynthSlider extends HTMLElement {
       </div>
       <input class="value-input" type="number" min="${minAttribute}" max="${maxAttribute}" step="${stepAttribute}" value="${value}" />
     `;
+
+    ensureBoxSizing(this.shadowRoot);
 
     this.rangeInput = this.shadowRoot.querySelector('input[type="range"]');
     this.valueInput = this.shadowRoot.querySelector('.value-input');

@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 export default class SynthSwitch extends HTMLElement {
   static get observedAttributes() {
     return ["disabled"];
@@ -139,6 +141,7 @@ export default class SynthSwitch extends HTMLElement {
         </label>
       </div>
     `;
+    ensureBoxSizing(this.shadowRoot);
 
     this.wrapper = this.shadowRoot.querySelector(".switch-wrapper");
     this.inputElement = this.shadowRoot.querySelector('input[type="checkbox"]');

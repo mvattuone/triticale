@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 export default class DndWrapper extends HTMLElement {
   constructor() {
     super();
@@ -15,6 +17,8 @@ export default class DndWrapper extends HTMLElement {
             </style>
             <slot></slot>
         `;
+
+    ensureBoxSizing(this.shadowRoot);
 
     this.dropzone = this.shadowRoot.querySelector("slot").assignedElements()[0];
     this.dropzone.ondragover = this.handleDragOver.bind(this);

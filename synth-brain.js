@@ -1,6 +1,8 @@
 import Databender from "databender";
+import Pizzicato from "pizzicato";
 import { chunk } from 'helpers/chunk.js';
 import { hannWindow } from 'helpers/hannWindow.js';
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
 
 export default class SynthBrain extends HTMLElement {
   constructor() {
@@ -11,7 +13,27 @@ export default class SynthBrain extends HTMLElement {
     this.imageGrains = [];
     this.config = {
       effects: {
-        biquad: {
+        delay: {
+          active: true,
+          feedback: 0.6,
+          time: 0.4,
+          mix: 0.5,
+        },
+        lowPassFilter: {
+          active: true,
+          frequency: 1200,
+          peak: 10,
+          mix: 0.4,
+        },
+        detune: {
+          active: false,
+          value: 0,
+          randomize: false,
+          randomValues: 4,
+          enablePartial: false,
+          areaOfEffect: 0.5,
+        },
+        biquadFilter: {
           active: false,
           areaOfEffect: 1,
           biquadFrequency: 8500,
@@ -22,21 +44,6 @@ export default class SynthBrain extends HTMLElement {
           randomize: false,
           type: "lowpass",
         },
-        bitcrusher: {
-          active: false,
-          bits: 4,
-          bufferSize: 4096,
-          normfreq: 0.1,
-        },
-        convolver: {
-          active: false,
-          dryLevel: 1,
-          highCut: 22050,
-          impulse: 'minster1_000_ortf_48k.wav',
-          level: 1,
-          lowCut: 20,
-          wetLevel: 1, 
-        }
       },
       grainIndex: 1,
       grainDuration: 200,
@@ -45,10 +52,25 @@ export default class SynthBrain extends HTMLElement {
       spray: 1,
       random: 0,
     };
-    this.databender = new Databender(this.config.effects, this.audioCtx);
+    this.databender = new Databender(
+      {
+        config: this.config.effects,
+        effectsChain: [
+          (payload) => this.detune(payload),
+          (payload) => this.biquadFilter(payload),
+          this.usePizzicatoEffect(Pizzicato.Effects.Delay, () => this.getEffectOptions("delay")),
+          this.usePizzicatoEffect(
+            Pizzicato.Effects.LowPassFilter,
+            () => this.getEffectOptions("lowPassFilter"),
+          ),
+        ],
+      },
+      this.audioCtx,
+    );
     this.shadowRoot.innerHTML = `
       <slot></slot>
     `;
+    ensureBoxSizing(this.shadowRoot);
     this.bufferSource;
     this.activeSources = new Set();
     this.isPlaying = false;
@@ -82,7 +104,90 @@ export default class SynthBrain extends HTMLElement {
     const { name, value } = e.detail;
 
     return this.updateConfig(name, value);
+  }
 
+  biquadFilter({ context, source, config }) {
+    const opts = config?.biquadFilter;
+    if (!opts?.active) {
+      return null;
+    }
+
+    const filter = context.createBiquadFilter();
+    filter.type = opts.type ?? 'lowpass';
+
+    const duration = source.buffer?.duration ?? 0;
+    const startTime = context.currentTime;
+    const rawFrequency = Number(opts.biquadFrequency ?? opts.frequency);
+    const targetFrequency = Number.isFinite(rawFrequency) ? Math.max(0, rawFrequency) : 200;
+    const rawDetune = Number(opts.detune);
+    const detuneValue = Number.isFinite(rawDetune) ? rawDetune : 0;
+    const area = Math.max(0, Number(opts.areaOfEffect) || 0);
+    const randomPoints = Math.max(0, Math.floor(Number(opts.randomValues) || 0));
+
+    filter.frequency.cancelScheduledValues(0);
+    filter.detune.cancelScheduledValues(0);
+
+    if (opts.randomize && randomPoints > 1 && duration > 0) {
+      const curve = new Float32Array(randomPoints);
+      for (let index = 0; index < randomPoints; index++) {
+        curve[index] = Math.random() * targetFrequency;
+      }
+      filter.frequency.setValueCurveAtTime(curve, startTime, duration);
+      filter.detune.setValueCurveAtTime(curve, startTime, duration);
+    } else if (opts.enablePartial) {
+      const epsilon = Math.max(area, 0.0001);
+      filter.frequency.setTargetAtTime(targetFrequency, startTime + area, epsilon);
+      filter.detune.setTargetAtTime(detuneValue, startTime + area, epsilon);
+    } else {
+      filter.frequency.setValueAtTime(targetFrequency, startTime);
+      filter.detune.setValueAtTime(detuneValue, startTime);
+    }
+
+    const rawQuality = Number(opts.quality);
+    filter.Q.value = Number.isFinite(rawQuality) ? rawQuality : 1;
+
+    return filter;
+  }
+
+  detune({ config, source, context }) {
+    const opts = config?.detune;
+    const audioParam = source?.detune;
+    if (!audioParam) {
+      return null;
+    }
+
+    const currentTime = context?.currentTime ?? 0;
+
+    audioParam.cancelScheduledValues(0);
+
+    if (!opts?.active) {
+      audioParam.setValueAtTime(0, currentTime);
+      return null;
+    }
+
+    const duration = source.buffer?.duration ?? 0;
+
+    if (opts.randomize && opts.randomValues > 1 && duration > 0) {
+      const pointCount = Math.max(2, Math.floor(Number(opts.randomValues)));
+      const curve = new Float32Array(pointCount);
+      const min = 0.0001;
+      const max = 400;
+      for (let index = 0; index < pointCount; index++) {
+        curve[index] = Math.random() * (max - min) + min;
+      }
+      audioParam.setValueCurveAtTime(curve, currentTime, duration);
+      return null;
+    }
+
+    if (opts.enablePartial) {
+      const area = Math.max(0, Number(opts.areaOfEffect) || 0);
+      const epsilon = Math.max(area, 0.0001);
+      audioParam.setTargetAtTime(Number(opts.value ?? 0), currentTime + area, epsilon);
+      return null;
+    }
+
+    audioParam.setValueAtTime(Number(opts.value ?? 0), currentTime);
+    return null;
   }
 
   updateConfig(name, value) { 
@@ -120,17 +225,32 @@ export default class SynthBrain extends HTMLElement {
     }
 
     if (name.includes(".")) {
-      const [groupKey, effectKey, valueKey] = name.split(".");
-      this.config = {
-        ...this.config,
-        [groupKey]: {
-          ...this.config[groupKey],
-          [effectKey]: {
-            ...this.config[groupKey][effectKey],
+      const segments = name.split(".");
+      if (segments.length === 2) {
+        const [groupKey, valueKey] = segments;
+        const groupConfig = this.config[groupKey] ?? {};
+        this.config = {
+          ...this.config,
+          [groupKey]: {
+            ...groupConfig,
             [valueKey]: nextValue,
           },
-        },
-      };
+        };
+      } else {
+        const [groupKey, effectKey, valueKey] = segments;
+        const groupConfig = this.config[groupKey] ?? {};
+        const effectConfig = (groupConfig && effectKey) ? groupConfig[effectKey] : undefined;
+        this.config = {
+          ...this.config,
+          [groupKey]: {
+            ...groupConfig,
+            [effectKey]: {
+              ...(effectConfig ?? {}),
+              [valueKey]: nextValue,
+            },
+          },
+        };
+      }
     } else {
       this.config = { ...this.config, [name]: nextValue };
     }
@@ -147,9 +267,11 @@ export default class SynthBrain extends HTMLElement {
       this.notifyGrainCounts();
     }
 
-    if (name.includes('effects')) {
-      const [,effectKey, valueKey] = name.split(".");
-      this.databender.updateConfig(effectKey, valueKey, nextValue);
+    if (name.startsWith('effects.')) {
+      const [, effectKey, valueKey] = name.split(".");
+      if (typeof this.databender?.updateConfig === 'function') {
+        this.databender.updateConfig(effectKey, valueKey, nextValue);
+      }
       this.invalidateProcessedAudio();
     }
 
@@ -179,6 +301,40 @@ export default class SynthBrain extends HTMLElement {
       }
       return undefined;
     }, this.config);
+  }
+
+
+  usePizzicatoEffect(EffectCtor, optionsOrFactory = {}) {
+    const getOptions =
+      typeof optionsOrFactory === 'function' ? optionsOrFactory : () => optionsOrFactory;
+
+    return ({ context }) => {
+      const previousContext = Pizzicato.context;
+      const resolved = getOptions() ?? {};
+      const { active, ...effectOptions } = resolved;
+
+      try {
+        if (active === false) {
+          const bypass = context.createGain();
+          return { input: bypass, output: bypass };
+        }
+
+        Pizzicato.context = context;
+        const effect = new EffectCtor(effectOptions);
+        return { input: effect.inputNode, output: effect.outputNode };
+      } finally {
+        Pizzicato.context = previousContext;
+      }
+    };
+  }
+
+  getEffectOptions(effectKey) {
+    const effectConfig = this.config?.effects?.[effectKey];
+    if (!effectConfig) {
+      return {};
+    }
+
+    return { ...effectConfig };
   }
 
   handleAudioUploaded(event) {

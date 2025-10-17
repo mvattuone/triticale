@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 const DEFAULT_SEGMENTS = 1;
 
 export default class SynthRibbon extends HTMLElement {
@@ -106,6 +108,8 @@ export default class SynthRibbon extends HTMLElement {
         </div>
       </div>
     `;
+
+    ensureBoxSizing(this.shadowRoot);
 
     this.ribbon = this.shadowRoot.querySelector('.ribbon');
     this.indicator = this.shadowRoot.querySelector('.indicator');

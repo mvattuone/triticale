@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 export default class SynthDial extends HTMLElement {
   static observedAttributes = ["min", "max", "value"];
   
@@ -170,12 +172,27 @@ export default class SynthDial extends HTMLElement {
       <label class="label">${label}</label>
     `;
 
+    ensureBoxSizing(this.shadowRoot);
+
+    this.startAngle = -140;
+    this.endAngle = 140;
+    this.rotationRangeRadians = (this.endAngle - this.startAngle) * (Math.PI / 180);
+
+    const dragAttr = this.getAttribute('drag-sensitivity');
+    const parsedDrag = dragAttr !== null ? parseFloat(dragAttr) : NaN;
+    this.dragSensitivity = Number.isFinite(parsedDrag) && parsedDrag > 0 ? parsedDrag : 1.2;
+
     this.min = min;
     this.max = max;
     this.step = step;
     this.stepPrecision = stepPrecision;
-    this.displayMode = formatAttr ? formatAttr.toLowerCase() : "number";
+    this.displayMode = this.percentMode
+      ? "number"
+      : formatAttr
+        ? formatAttr.toLowerCase()
+        : "number";
     this.value = value;
+    this.continuousValue = value;
     this.inputName = inputName;
 
     this.dialContainer = this.shadowRoot.querySelector('.dial-container');
@@ -188,9 +205,9 @@ export default class SynthDial extends HTMLElement {
     this.startValue = 0;
 
     if (this.percentMode) {
-      this.valueInput.setAttribute('inputmode', 'numeric');
-      this.valueInput.setAttribute('pattern', '[0-9]*%?');
-      this.valueInput.setAttribute('placeholder', '0%');
+      this.valueInput.setAttribute('inputmode', 'decimal');
+      this.valueInput.setAttribute('pattern', '[0-9]*\\.?[0-9]*');
+      this.valueInput.setAttribute('placeholder', '0.0');
     }
 
     this.createTicks();
@@ -210,13 +227,11 @@ export default class SynthDial extends HTMLElement {
   
   createTicks() {
     const totalTicks = 21;
-    const startAngle = -140;
-    const endAngle = 140;
-    const angleRange = endAngle - startAngle;
+    const angleRange = this.endAngle - this.startAngle;
     
     for (let i = 0; i < totalTicks; i++) {
       const tick = document.createElement('div');
-      const angle = startAngle + (angleRange * i / (totalTicks - 1));
+      const angle = this.startAngle + (angleRange * i / (totalTicks - 1));
       const isMajor = i % 5 === 0;
       
       tick.className = isMajor ? 'tick major' : 'tick';
@@ -227,20 +242,14 @@ export default class SynthDial extends HTMLElement {
   
   valueToAngle(value) {
     const normalized = (value - this.min) / (this.max - this.min);
-    const startAngle = -140;
-    const endAngle = 140;
-    return startAngle + normalized * (endAngle - startAngle);
+    return this.startAngle + normalized * (this.endAngle - this.startAngle);
   }
   
   updateRotation() {
     const angle = this.valueToAngle(this.value);
     this.dialIndicator.style.transform = `rotate(${angle}deg)`;
     if (this.valueInput) {
-      if (this.percentMode) {
-        this.valueInput.value = `${Math.round(this.value * 100)}%`;
-      } else {
-        this.valueInput.value = this.formatValue(this.value);
-      }
+      this.valueInput.value = this.formatValue(this.value);
     }
   }
 
@@ -285,40 +294,39 @@ export default class SynthDial extends HTMLElement {
         numericValue = parseFloat(cleaned);
         if (Number.isNaN(numericValue)) {
           if (this.valueInput) {
-            this.valueInput.value = `${Math.round(this.value * 100)}%`;
+            this.valueInput.value = this.formatValue(this.value);
           }
           return;
         }
-        numericValue = numericValue / 100;
       }
     } else {
       numericValue = typeof rawValue === "number" ? rawValue : parseFloat(rawValue);
     }
     if (Number.isNaN(numericValue)) {
       if (this.valueInput) {
-        this.valueInput.value = this.percentMode
-          ? `${Math.round(this.value * 100)}%`
-          : this.formatValue(this.value);
+        this.valueInput.value = this.formatValue(this.value);
       }
       return;
     }
 
     numericValue = Math.max(this.min, Math.min(this.max, numericValue));
+    this.continuousValue = numericValue;
 
+    let quantizedValue = numericValue;
     if (this.step > 0) {
-      numericValue = Math.round((numericValue - this.min) / this.step) * this.step + this.min;
+      quantizedValue = Math.round((numericValue - this.min) / this.step) * this.step + this.min;
     }
 
     const precision = Math.max(this.stepPrecision, 4);
-    numericValue = parseFloat(numericValue.toFixed(precision));
-    numericValue = Math.max(this.min, Math.min(this.max, numericValue));
+    quantizedValue = parseFloat(quantizedValue.toFixed(precision));
+    quantizedValue = Math.max(this.min, Math.min(this.max, quantizedValue));
 
-    if (numericValue === this.value) {
+    if (quantizedValue === this.value) {
       this.updateRotation();
       return;
     }
 
-    this.value = numericValue;
+    this.value = quantizedValue;
     this.updateRotation();
 
     if (emit) {
@@ -337,9 +345,7 @@ export default class SynthDial extends HTMLElement {
       this.valueInput.blur();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      this.valueInput.value = this.percentMode
-        ? `${Math.round(this.value * 100)}%`
-        : this.formatValue(this.value);
+      this.valueInput.value = this.formatValue(this.value);
       this.valueInput.blur();
     }
   }
@@ -357,6 +363,7 @@ export default class SynthDial extends HTMLElement {
     this.centerY = rect.top + rect.height / 2;
     
     this.previousAngle = Math.atan2(e.clientY - this.centerY, e.clientX - this.centerX);
+    this.continuousValue = this.value;
     
     document.addEventListener('mousemove', this.handleMouseMove);
     document.addEventListener('mouseup', this.handleMouseUp);
@@ -380,15 +387,19 @@ export default class SynthDial extends HTMLElement {
     
     // Convert angle delta to value change
     const range = this.max - this.min;
-    const fullRotation = Math.PI * 1.4; // 280 degrees range
+    const fullRotation = this.rotationRangeRadians * this.dragSensitivity;
     const valueChange = (angleDelta / fullRotation) * range;
     
-    const newValue = this.value + valueChange;
+    const baseValue = typeof this.continuousValue === "number"
+      ? this.continuousValue
+      : this.value;
+    const newValue = baseValue + valueChange;
     this.commitValueChange(newValue, true);
   }
   
   handleMouseUp() {
     this.isDragging = false;
+    this.continuousValue = this.value;
     document.removeEventListener('mousemove', this.handleMouseMove);
     document.removeEventListener('mouseup', this.handleMouseUp);
   }
@@ -403,6 +414,7 @@ export default class SynthDial extends HTMLElement {
     this.centerY = rect.top + rect.height / 2;
     
     this.previousAngle = Math.atan2(touch.clientY - this.centerY, touch.clientX - this.centerX);
+    this.continuousValue = this.value;
     
     document.addEventListener('touchmove', this.handleTouchMove, { passive: false });
     document.addEventListener('touchend', this.handleTouchEnd);
@@ -428,15 +440,19 @@ export default class SynthDial extends HTMLElement {
     
     // Convert angle delta to value change
     const range = this.max - this.min;
-    const fullRotation = Math.PI * 1.4; // 280 degrees range
+    const fullRotation = this.rotationRangeRadians * this.dragSensitivity;
     const valueChange = (angleDelta / fullRotation) * range;
     
-    const newValue = this.value + valueChange;
+    const baseValue = typeof this.continuousValue === "number"
+      ? this.continuousValue
+      : this.value;
+    const newValue = baseValue + valueChange;
     this.commitValueChange(newValue, true);
   }
   
   handleTouchEnd() {
     this.isDragging = false;
+    this.continuousValue = this.value;
     document.removeEventListener('touchmove', this.handleTouchMove);
     document.removeEventListener('touchend', this.handleTouchEnd);
   }

@@ -6,13 +6,11 @@
   "main": "main.js",
   "dependencies": {
     "dat.gui": "^0.7.1",
-    "databender": "1.0.2",
+    "databender": "^1.0.2",
     "lodash.chunk": "^4.2.0",
-    "tunajs": "^1.0.1"
+    "pizzicato": "^0.6.4"
   },
   "scripts": {
-    "build": "rollup -c",
-    "build:watch": "rollup -cw",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

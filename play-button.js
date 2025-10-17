@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 export default class PlayButton extends HTMLElement {
   constructor() {
     super();
@@ -198,6 +200,8 @@ export default class PlayButton extends HTMLElement {
         <span class="label">Play</span>
       </button>
     `;
+
+    ensureBoxSizing(this.shadowRoot);
 
     this.button = this.shadowRoot.querySelector("button");
     this.label = this.shadowRoot.querySelector(".label");
