@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 class SynthDisplay extends HTMLElement {
   constructor() {
     super();
@@ -15,6 +17,7 @@ class SynthDisplay extends HTMLElement {
                     inset 10px 14px 18px rgba(0, 0, 0, 0.7),
                     inset -8px -10px 16px rgba(45, 50, 60, 0.85),
                     0 18px 40px rgba(0, 0, 0, 0.55);
+                  height: 100%;
                 }
 
                 .display {
@@ -63,12 +66,44 @@ class SynthDisplay extends HTMLElement {
                 }
 
                 .control-buttons button {
-                  padding: 0.35rem 0.55rem;
-                  border-radius: 999px;
+                  width: 32px;
+                  height: 32px;
+                  padding: 0;
+                  border-radius: 50%;
                   border: 1px solid #0e1116;
                   background: linear-gradient(145deg, #efefef, #bcbcbc);
                   cursor: pointer;
-                  font-size: 11px;
+                  font-size: 13px;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  line-height: 1;
+                }
+
+                .control-buttons .icon-refresh {
+                  width: 16px;
+                  height: 16px;
+                  display: inline-block;
+                }
+
+                .control-buttons .icon-refresh svg {
+                  display: block;
+                  width: 100%;
+                  height: 100%;
+                  fill: none;
+                  stroke: #1a1d24;
+                  stroke-width: 1.8;
+                  stroke-linecap: round;
+                  stroke-linejoin: round;
+                }
+
+                .control-buttons .icon-refresh svg path {
+                  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
+                }
+
+                .control-buttons .remove {
+                  font-weight: 600;
+                  letter-spacing: 0.08em;
                 }
 
                 canvas {
@@ -134,7 +169,16 @@ class SynthDisplay extends HTMLElement {
                   <div class="display">
                     <button class="random-trigger" type="button">Random image</button>
                     <div class="control-buttons">
-                      <button class="refresh" type="button" aria-label="Load new random image">R</button>
+                      <button class="refresh" type="button" aria-label="Load new random image">
+                        <span class="icon-refresh" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" role="presentation">
+                            <path d="M21 4v6h-6" />
+                            <path d="M3 20v-6h6" />
+                            <path d="M4.5 9a7 7 0 0 1 11.5-3L21 10" />
+                            <path d="M19.5 15a7 7 0 0 1-11.5 3L3 14" />
+                          </svg>
+                        </span>
+                      </button>
                       <button class="remove" type="button" aria-label="Remove image">X</button>
                     </div>
                     <canvas class="display-canvas"></canvas>
@@ -146,6 +190,8 @@ class SynthDisplay extends HTMLElement {
                   </dnd-wrapper>
               </div>
         `;
+    ensureBoxSizing(this.shadowRoot);
+
     this.displayContainer = this.shadowRoot.querySelector(".display");
     this.canvas = this.shadowRoot.querySelector(".display-canvas");
     this.context = this.canvas.getContext("2d");

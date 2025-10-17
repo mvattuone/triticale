@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 export default class SynthWaveform extends HTMLElement {
   constructor() {
     super();
@@ -71,12 +73,44 @@ export default class SynthWaveform extends HTMLElement {
                 }
 
                 .control-buttons button {
-                  padding: 0.3rem 0.55rem;
-                  border-radius: 999px;
+                  width: 32px;
+                  height: 32px;
+                  padding: 0;
+                  border-radius: 50%;
                   border: 1px solid #0e1116;
                   background: linear-gradient(145deg, #f0f5ef, #cdd8cf);
                   cursor: pointer;
-                  font-size: 10px;
+                  font-size: 12px;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  line-height: 1;
+                }
+
+                .control-buttons .icon-refresh {
+                  width: 16px;
+                  height: 16px;
+                  display: inline-block;
+                }
+
+                .control-buttons .icon-refresh svg {
+                  display: block;
+                  width: 100%;
+                  height: 100%;
+                  fill: none;
+                  stroke: #132b24;
+                  stroke-width: 1.6;
+                  stroke-linecap: round;
+                  stroke-linejoin: round;
+                }
+
+                .control-buttons .icon-refresh svg path {
+                  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
+                }
+
+                .control-buttons .remove {
+                  font-weight: 600;
+                  letter-spacing: 0.08em;
                 }
 
                 .osc-grid {
@@ -160,7 +194,16 @@ export default class SynthWaveform extends HTMLElement {
                 <div class="display waveform">
                   <button class="random-trigger" type="button">Random audio</button>
                   <div class="control-buttons">
-                    <button class="refresh" type="button" aria-label="Load new random audio">R</button>
+                    <button class="refresh" type="button" aria-label="Load new random audio">
+                      <span class="icon-refresh" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" role="presentation">
+                          <path d="M21 4v6h-6" />
+                          <path d="M3 20v-6h6" />
+                          <path d="M4.5 9a7 7 0 0 1 11.5-3L21 10" />
+                          <path d="M19.5 15a7 7 0 0 1-11.5 3L3 14" />
+                        </svg>
+                      </span>
+                    </button>
                     <button class="remove" type="button" aria-label="Remove audio">X</button>
                   </div>
                   <div class="osc-grid"></div>
@@ -173,6 +216,8 @@ export default class SynthWaveform extends HTMLElement {
             </dnd-wrapper>
             </div>
         `;
+    ensureBoxSizing(this.shadowRoot);
+
     this.waveformContainer = this.shadowRoot.querySelector(".display.waveform");
     this.canvas = this.shadowRoot.querySelector(".waveform-canvas");
     this.context = this.canvas.getContext("2d");

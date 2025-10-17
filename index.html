@@ -21,17 +21,16 @@
     </script>
   </head>
   <body>
-    <header>Triticale</header>
     <synth-brain>
       <main>
       <section id="granulation">
         <h4>Granulation</h4>
-        <div>
+        <div class="synth-controls">
         <synth-dial
           name="grainDuration"
           min="1"
           max="1000"
-          label="Grain Duration"
+          label="Duration"
         ></synth-dial>
         <synth-dial
           name="density"
@@ -63,81 +62,150 @@
         ></synth-dial>
         </div>
       </section>
-      <section id="visuals">
-        <synth-display></synth-display>
-        <synth-waveform></synth-waveform>
-      </section>
+      <synth-display></synth-display>
+      <synth-waveform></synth-waveform>
       <section id="effects">
-        <div>
-        <synth-switch name="effects.bitcrusher.active" label="Bitcrusher"></synth-switch>
-        <synth-dial
-          min="0"
-          max="16"
-          step="4"
-          name="effects.bitcrusher.bits"
-          label="Bits"
-        ></synth-dial>
-        <synth-dial
-          min="0.0001"
-          max="1"
-          step="0.001"
-          name="effects.bitcrusher.normfreq"
-          label="Norm Freq"
-        ></synth-dial>
+        <h4>Effects</h4>
+        <div class="synth-effect">
+          <synth-switch name="effects.delay.active" label="Delay"></synth-switch>
+          <div class="synth-controls">
+            <synth-dial
+              min="0"
+              max="1"
+              step="0.01"
+              name="effects.delay.feedback"
+              label="Feedback"
+            ></synth-dial>
+            <synth-dial
+              min="0"
+              max="1"
+              step="0.01"
+              name="effects.delay.time"
+              label="Time"
+            ></synth-dial>
+            <synth-dial
+              min="0"
+              max="1"
+              step="0.01"
+              name="effects.delay.mix"
+              label="Mix"
+            ></synth-dial>
+          </div>
         </div>
-        <div>
-        <synth-switch name="effects.convolver.active" label="Reverb"></synth-switch>
-        <synth-dial
-          min="0"
-          max="1"
-          step="0.01"
-          name="effects.convolver.level"
-          label="Level"
-        ></synth-dial>
-        <!-- <synth-select -->
-        <!--   name="effects.convolver.impulse" -->
-        <!--   label="Type" -->
-        <!--   options=" -->
-        <!-- ></synth-select> -->
-      </div>
-      <div>
-        <synth-switch name="effects.biquad.active" label="Biquad"></synth-switch>
-        <synth-dial
-          min="0"
-          max="1"
-          step="0.01"
-          name="effects.biquad.areaOfEffect"
-          label="Area Of Effect"
-        ></synth-dial>
-        <synth-dial
-          name="effects.biquad.detune"
-          label="Detune"
-        ></synth-dial>
-        <synth-dial
-          name="effects.biquad.quality"
-          label="Quality"
-        ></synth-dial>
-        <synth-dial
-          name="effects.biquad.randomValues"
-          label="Random Values"
-        ></synth-dial>
-        <synth-select
-          name="effects.biquad.type"
-          label="Type"
-          options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
-        ></synth-select>
-        <synth-dial min="20" max="44000" label="Frequency" name="effects.biquad.biquadFrequency"
-></synth-dial>
-        <synth-switch
-          name="effects.biquad.randomize"
-          label="Randomize"
-        ></synth-switch>
-        <synth-switch
-          name="effects.biquad.enablePartial"
-          label="Enable Partial"
-        ></synth-switch>
-      </div>
-    </section>
+        <div class="synth-effect">
+          <synth-switch name="effects.lowPassFilter.active" label="Low Pass"></synth-switch>
+          <div class="synth-controls">
+            <synth-dial
+              min="20"
+              max="20000"
+              step="1"
+              name="effects.lowPassFilter.frequency"
+              label="Frequency"
+            ></synth-dial>
+            <synth-dial
+              min="0"
+              max="10"
+              step="0.1"
+              name="effects.lowPassFilter.peak"
+              label="Peak"
+            ></synth-dial>
+            <synth-dial
+              min="0"
+              max="1"
+              step="0.01"
+              name="effects.lowPassFilter.mix"
+              label="Mix"
+            ></synth-dial>
+          </div>
+        </div>
+        <div class="synth-effect">
+          <synth-switch name="effects.detune.active" label="Detune"></synth-switch>
+          <div class="synth-controls">
+            <synth-dial
+              min="-1200"
+              max="1200"
+              step="1"
+              name="effects.detune.value"
+              label="Value"
+            ></synth-dial>
+            <synth-dial
+              min="0"
+              max="1"
+              step="0.01"
+              name="effects.detune.areaOfEffect"
+              label="Area"
+            ></synth-dial>
+            <synth-dial
+              min="2"
+              max="64"
+              step="1"
+              name="effects.detune.randomValues"
+              label="Random Points"
+            ></synth-dial>
+            <synth-switch
+              name="effects.detune.randomize"
+              label="Randomize"
+            ></synth-switch>
+            <synth-switch
+              name="effects.detune.enablePartial"
+              label="Partial"
+            ></synth-switch>
+          </div>
+        </div>
+        <div class="synth-effect">
+          <synth-switch name="effects.biquadFilter.active" label="Biquad Filter"></synth-switch>
+          <div class="synth-controls">
+            <synth-select
+              name="effects.biquadFilter.type"
+              label="Type"
+              options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
+            ></synth-select>
+            <synth-dial
+              min="20"
+              max="22050"
+              step="1"
+              name="effects.biquadFilter.biquadFrequency"
+              label="Frequency"
+            ></synth-dial>
+            <synth-dial
+              min="0"
+              max="20"
+              step="0.1"
+              name="effects.biquadFilter.quality"
+              label="Quality"
+            ></synth-dial>
+            <synth-dial
+              min="-1200"
+              max="1200"
+              step="1"
+              name="effects.biquadFilter.detune"
+              label="Detune"
+            ></synth-dial>
+            <synth-dial
+              min="2"
+              max="64"
+              step="1"
+              name="effects.biquadFilter.randomValues"
+              label="Random Points"
+            ></synth-dial>
+            <synth-switch
+              name="effects.biquadFilter.randomize"
+              label="Randomize"
+            ></synth-switch>
+            <synth-switch
+              name="effects.biquadFilter.enablePartial"
+              label="Partial"
+            ></synth-switch>
+            <synth-dial
+              min="0"
+              max="1"
+              step="0.01"
+              name="effects.biquadFilter.areaOfEffect"
+              label="Area"
+            ></synth-dial>
+          </div>
+        </div>
+      </section>
     <section id="bottom">
       <div>
         <play-button></play-button>
@@ -146,13 +214,12 @@
     </section>
       </main>
     </synth-brain>
-    <footer></footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tunajs/1.0.4/tuna-min.js"></script>
     <script type="importmap">
       {
         "imports": {
           "databender": "/node_modules/databender/index.js",
+          "pizzicato": "./helpers/pizzicato.js",
           "helpers/": "./helpers/"
         }
       }

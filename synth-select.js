@@ -1,3 +1,5 @@
+import { ensureBoxSizing } from 'helpers/boxSizing.js';
+
 export default class SynthSelect extends HTMLElement {
   constructor() {
     super();
@@ -12,6 +14,8 @@ export default class SynthSelect extends HTMLElement {
         ${options.map(({ label, value }) => `<option value=${value}>${label}</option>`)}
       </select>
     `;
+
+    ensureBoxSizing(this.shadowRoot);
 
     this.selectElement = this.shadowRoot.querySelector("select");
     this.handleOnChange = this.handleOnChange.bind(this);
