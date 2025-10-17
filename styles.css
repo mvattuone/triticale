@@ -32,6 +32,11 @@ main  {
 
 }
 
+#granulation .synth-controls {
+  align-items: center;
+  flex-direction: column;
+}
+
 #granulation {
   display: flex;
   flex-direction: column;
@@ -86,24 +91,27 @@ synth-waveform {
   row-gap: 12px;
 }
 
-#bottom > div {
+.bottom-controls {
   align-items: center;
   display: flex;
+  gap: 24px;
   padding: 0 40px;
   height: 100%;
 }
 
-play-button {
+.bottom-controls synth-joystick {
+  flex: 0 0 auto;
+}
+
+.bottom-controls synth-ribbon {
+  flex: 1 1 auto;
+}
+
+.bottom-controls play-button {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 24px;
-}
-
-synth-ribbon { 
-  flex-grow: 8;
-  flex-shrink: 1;
 }
 
 #bottom dnd-wrapper {

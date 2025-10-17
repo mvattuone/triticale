@@ -66,6 +66,25 @@
       <synth-waveform></synth-waveform>
       <section id="effects">
         <h4>Effects</h4>
+         <div class="synth-effect">
+          <synth-switch name="effects.bitcrusher.active" label="Bitcrusher"></synth-switch>
+          <div class="synth-controls">
+          <synth-dial
+            min="0"
+            max="16"
+            step="4"
+            name="effects.bitcrusher.bits"
+            label="Bits"
+          ></synth-dial>
+          <synth-dial
+            min="0.0001"
+            max="1"dial
+            step="0.001"
+            name="effects.bitcrusher.normfreq"
+            label="Norm Freq"
+          ></synth-dial>
+          </div>
+        </div>
         <div class="synth-effect">
           <synth-switch name="effects.delay.active" label="Delay"></synth-switch>
           <div class="synth-controls">
@@ -93,70 +112,10 @@
           </div>
         </div>
         <div class="synth-effect">
-          <synth-switch name="effects.lowPassFilter.active" label="Low Pass"></synth-switch>
-          <div class="synth-controls">
-            <synth-dial
-              min="20"
-              max="20000"
-              step="1"
-              name="effects.lowPassFilter.frequency"
-              label="Frequency"
-            ></synth-dial>
-            <synth-dial
-              min="0"
-              max="10"
-              step="0.1"
-              name="effects.lowPassFilter.peak"
-              label="Peak"
-            ></synth-dial>
-            <synth-dial
-              min="0"
-              max="1"
-              step="0.01"
-              name="effects.lowPassFilter.mix"
-              label="Mix"
-            ></synth-dial>
-          </div>
-        </div>
-        <div class="synth-effect">
-          <synth-switch name="effects.detune.active" label="Detune"></synth-switch>
-          <div class="synth-controls">
-            <synth-dial
-              min="-1200"
-              max="1200"
-              step="1"
-              name="effects.detune.value"
-              label="Value"
-            ></synth-dial>
-            <synth-dial
-              min="0"
-              max="1"
-              step="0.01"
-              name="effects.detune.areaOfEffect"
-              label="Area"
-            ></synth-dial>
-            <synth-dial
-              min="2"
-              max="64"
-              step="1"
-              name="effects.detune.randomValues"
-              label="Random Points"
-            ></synth-dial>
-            <synth-switch
-              name="effects.detune.randomize"
-              label="Randomize"
-            ></synth-switch>
-            <synth-switch
-              name="effects.detune.enablePartial"
-              label="Partial"
-            ></synth-switch>
-          </div>
-        </div>
-        <div class="synth-effect">
-          <synth-switch name="effects.biquadFilter.active" label="Biquad Filter"></synth-switch>
+          <synth-switch name="effects.biquad.active" label="Biquad Filter"></synth-switch>
           <div class="synth-controls">
             <synth-select
-              name="effects.biquadFilter.type"
+              name="effects.biquad.type"
               label="Type"
               options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
             ></synth-select>
@@ -164,52 +123,40 @@
               min="20"
               max="22050"
               step="1"
-              name="effects.biquadFilter.biquadFrequency"
+              name="effects.biquad.biquadFrequency"
               label="Frequency"
             ></synth-dial>
             <synth-dial
               min="0"
               max="20"
               step="0.1"
-              name="effects.biquadFilter.quality"
+              name="effects.biquad.quality"
               label="Quality"
-            ></synth-dial>
-            <synth-dial
-              min="-1200"
-              max="1200"
-              step="1"
-              name="effects.biquadFilter.detune"
-              label="Detune"
             ></synth-dial>
             <synth-dial
               min="2"
               max="64"
               step="1"
-              name="effects.biquadFilter.randomValues"
+              name="effects.biquad.randomValues"
               label="Random Points"
             ></synth-dial>
             <synth-switch
-              name="effects.biquadFilter.randomize"
+              name="effects.biquad.randomize"
               label="Randomize"
             ></synth-switch>
-            <synth-switch
-              name="effects.biquadFilter.enablePartial"
-              label="Partial"
-            ></synth-switch>
-            <synth-dial
-              min="0"
-              max="1"
-              step="0.01"
-              name="effects.biquadFilter.areaOfEffect"
-              label="Area"
-            ></synth-dial>
           </div>
         </div>
       </section>
     <section id="bottom">
-      <div>
-        <play-button></play-button>
+      <div class="bottom-controls">
+        <synth-joystick
+          name="effects.detune.value"
+          min="-1200"
+          max="1200"
+          label="Pitch"
+        ></synth-joystick>
         <synth-ribbon></synth-ribbon>
+        <play-button></play-button>
       </div>
     </section>
       </main>
