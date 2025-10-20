@@ -76,8 +76,8 @@ export default class SynthBrain extends HTMLElement {
           (payload) => this.detune(payload),
           (payload) => this.biquadFilter(payload),
         ],
+        audioCtx: this.audioCtx,
       },
-      this.audioCtx,
     );
     this.shadowRoot.innerHTML = `
       <slot></slot>
