@@ -55,7 +55,7 @@ export default class SynthBrain extends HTMLElement {
           biquadFrequency: 8500,
           detune: 0,
           enablePartial: false,
-          quality: 0,
+          quality: 1,
           randomValues: 2,
           randomize: false,
           type: "lowpass",
