@@ -50,6 +50,17 @@ main  {
   grid-area: visuals;
 }
 
+#effects .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+#effects .section-heading synth-segmented {
+  flex-shrink: 0;
+}
+
 #effects {
   display: flex;
   flex-direction: column;
