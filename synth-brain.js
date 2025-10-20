@@ -56,8 +56,7 @@ export default class SynthBrain extends HTMLElement {
           detune: 0,
           enablePartial: false,
           quality: 1,
-          randomValues: 2,
-          randomize: false,
+          randomValues: 0,
           type: "lowpass",
         },
       },
@@ -204,7 +203,7 @@ export default class SynthBrain extends HTMLElement {
 
     let waveArray = null;
 
-    if (biquadConfig.randomize) {
+    if (biquadConfig.randomValues > 0) {
       waveArray = new Float32Array(biquadConfig.randomValues);
       for (let index = 0; index < biquadConfig.randomValues; index += 1) {
         waveArray[index] = random(0.0001, biquadConfig.biquadFrequency);
@@ -214,7 +213,7 @@ export default class SynthBrain extends HTMLElement {
     const biquadFilter = context.createBiquadFilter();
     biquadFilter.type = biquadConfig.type;
 
-    if (biquadConfig.randomize && waveArray) {
+    if (biquadConfig.randomValues > 0 && waveArray) {
       biquadFilter.frequency.cancelScheduledValues(0);
       biquadFilter.frequency.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
       biquadFilter.detune.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
