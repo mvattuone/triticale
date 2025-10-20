@@ -24,7 +24,9 @@
     <synth-brain>
       <main>
       <section id="granulation">
-        <h4>Granulation</h4>
+        <div class="section-heading">
+          <h4>Granulation</h4>
+        </div>
         <div class="synth-controls">
         <synth-dial
           name="grainDuration"
@@ -72,6 +74,7 @@
             options='[{"value":"series","label":"Linear"},{"value":"parallel","label":"Parallel"}]'
           ></synth-segmented>
         </div>
+        <div class="synth-effects">
          <div class="synth-effect">
           <synth-switch name="effects.bitcrusher.active" label="Bitcrusher"></synth-switch>
           <div class="synth-controls">
@@ -149,18 +152,21 @@
             ></synth-dial>
           </div>
         </div>
+        </div>
       </section>
-    <section id="bottom">
-      <div class="bottom-controls">
+    <section id="joystick">
         <synth-joystick
           name="effects.detune.value"
           min="-1200"
           max="1200"
           label="Pitch"
         ></synth-joystick>
-        <synth-ribbon></synth-ribbon>
-        <play-button></play-button>
-      </div>
+    </section>
+    <section id="ribbon">
+      <synth-ribbon></synth-ribbon>
+    </section>
+    <section id="transport">
+      <play-button></play-button>
     </section>
       </main>
     </synth-brain>
