@@ -20,9 +20,8 @@ export default class SynthJoystick extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = `
       <style>
-      :host {
+:host {
   --joystick-width: 62px;              /* outer panel (square is fine) */
-  --joystick-height: 124px;
   --track-width: 26px;                  /* vertical slot width */
   --nub-width: 28px;                    /* little horizontal handle */
   --nub-height: 16px;
@@ -37,15 +36,22 @@ export default class SynthJoystick extends HTMLElement {
   gap: 14px;
   color: inherit;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  height: 100%;
 }
 
 /* ============ PANEL / BASE ============ */
-.wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.wrapper {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
 
 .joystick-base {
   position: relative;
   width: var(--joystick-width);
-  height: var(--joystick-height);
+  flex: 1 1 auto;
   border-radius: 16px;
   background: radial-gradient(120% 90% at 40% 35%, var(--panel-hi), var(--panel) 60%);
   box-shadow:
@@ -53,7 +59,6 @@ export default class SynthJoystick extends HTMLElement {
     inset 0 -18px 28px rgba(0,0,0,.9),
     0 18px 34px rgba(0,0,0,.55);
   cursor: grab;
-  overflow: hidden;
   touch-action: none;
 }
 
@@ -90,25 +95,24 @@ export default class SynthJoystick extends HTMLElement {
   transform: translateY(-50%);
   pointer-events: none; user-select: none;
 }
-.joystick-base i::before { content: "▲"; display: block; font-size: 11px; line-height: 1; }
-.joystick-base i::after  { content: "▼"; display: block; font-size: 11px; line-height: 1; }
 
 /* ============ HANDLE + TRACK ============ */
 .joystick-handle {
   position: absolute;
-  left: 50%; top: 50%;
+  left: 50%;
+  top: 50%;
   width: var(--track-width);
-  height: calc(100% - 14px);
-  margin-left: calc(-1 * var(--track-width) / 2);
-  margin-top: calc(-1 * (100% + 40px) / 2);
+  height: calc(100% - 28px);
   display: grid;
   grid-template-rows: 1fr auto;       /* tall stem + nub */
   align-items: center;
   justify-items: center;
+  transform: translate(-50%, -50%);
   transform-style: preserve-3d;
   transition: transform .1s ease-out;
   pointer-events: none;
 }
+
 .joystick-base.interacting .joystick-handle { transition: none; }
 
 /* The recessed vertical slot with orange glow */
