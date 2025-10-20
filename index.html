@@ -118,12 +118,14 @@
           </div>
         </div>
         <div class="synth-effect">
+          <div class="section-heading">
+          <synth-switch name="effects.biquad.active" label="Filter"></synth-switch>
+          <synth-select
+            name="effects.biquad.type"
+            options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
+          ></synth-select>
+          </div>
           <div class="synth-controls">
-            <synth-select
-              name="effects.biquad.type"
-              label="Type"
-              options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
-            ></synth-select>
             <synth-dial
               min="20"
               max="22050"
