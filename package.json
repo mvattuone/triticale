@@ -6,7 +6,7 @@
   "main": "main.js",
   "dependencies": {
     "dat.gui": "^0.7.1",
-    "databender": "^1.0.2",
+    "databender": "2.0.0-alpha.0",
     "lodash.chunk": "^4.2.0",
     "pizzicato": "^0.6.4"
   },
