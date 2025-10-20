@@ -682,6 +682,17 @@ export default class SynthBrain extends HTMLElement {
         );
 
         document.querySelector('link[rel="icon"]').setAttribute('href', canvas.toDataURL('image/png'));
+
+        const drawGrainEvent = new CustomEvent('draw-grain', {
+          detail: {
+            grainIndex: segmentIndex,
+            segmentCount,
+            grains: this.imageGrains,
+          },
+          bubbles: true,
+          composed: true,
+        });
+        document.querySelector('synth-ribbon')?.dispatchEvent(drawGrainEvent);
       });
   }
 

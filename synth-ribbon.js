@@ -335,15 +335,24 @@ export default class SynthRibbon extends HTMLElement {
   }
 
   handleGrainCountChanged(event) {
-    const { total } = event.detail || {};
-    const { audio } = event.detail || {};
-    if (typeof audio === 'number') {
-      this.updateSegments(audio > 0 ? audio : 0);
+    const { audio, image, total } = event.detail || {};
+
+    if (typeof audio === 'number' && audio > 0) {
+      this.updateSegments(audio);
       return;
     }
+
+    if (typeof image === 'number' && image > 0) {
+      this.updateSegments(image);
+      return;
+    }
+
     if (typeof total === 'number') {
       this.updateSegments(total);
+      return;
     }
+
+    this.updateSegments(0);
   }
 
   isPlaybackActive() {
