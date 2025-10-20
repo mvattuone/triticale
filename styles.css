@@ -84,6 +84,22 @@ synth-waveform {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+
+  &:not(:first-child)::after {
+    background-clip: content-box;
+    background-image: repeating-linear-gradient(
+      to right,
+      white 0 6px,
+      transparent 6px 12px
+    );
+    box-sizing: border-box;
+    block-size: 1px;
+    inset-inline: 0;
+    content: "";
+    position: absolute;
+    inset-block-start: -18px;
+  }
 }
 
 .synth-controls {
