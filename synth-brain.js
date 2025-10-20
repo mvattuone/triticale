@@ -196,29 +196,45 @@ export default class SynthBrain extends HTMLElement {
 
 
   biquadFilter({ config, context, source }) {
-     if (config.biquad.randomize) {
-    var waveArray = new Float32Array(config.biquad.randomValues);
-    for (let i=0;i<config.biquad.randomValues;i++) {
-      waveArray[i] = random(0.0001, config.biquad.biquadFrequency); 
+    const biquadConfig = (config && config.biquad) || this.config?.effects?.biquad;
+
+    if (!biquadConfig?.active) {
+      return null;
     }
-  }
-  var biquadFilter = context.createBiquadFilter();
-  biquadFilter.type = config.biquad.type;
-  if (config.biquad.randomize) {
-    biquadFilter.frequency.cancelScheduledValues(0);
-    biquadFilter.frequency.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
-    biquadFilter.detune.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
-  } else if (config.biquad.enablePartial) {
-    biquadFilter.frequency.cancelScheduledValues(0);
-    biquadFilter.frequency.setTargetAtTime(config.biquad.biquadFrequency, config.biquad.areaOfEffect, config.biquad.areaOfEffect);
-  } else {
-    biquadFilter.frequency.cancelScheduledValues(0);
-    biquadFilter.frequency.value = config.biquad.biquadFrequency;
-  };
-  biquadFilter.Q.value = config.biquad.quality;
-  biquadFilter.detune.cancelScheduledValues(0);
-  biquadFilter.detune.value = config.biquad.detune;
-  return biquadFilter;
+
+    let waveArray = null;
+
+    if (biquadConfig.randomize) {
+      waveArray = new Float32Array(biquadConfig.randomValues);
+      for (let index = 0; index < biquadConfig.randomValues; index += 1) {
+        waveArray[index] = random(0.0001, biquadConfig.biquadFrequency);
+      }
+    }
+
+    const biquadFilter = context.createBiquadFilter();
+    biquadFilter.type = biquadConfig.type;
+
+    if (biquadConfig.randomize && waveArray) {
+      biquadFilter.frequency.cancelScheduledValues(0);
+      biquadFilter.frequency.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
+      biquadFilter.detune.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
+    } else if (biquadConfig.enablePartial) {
+      biquadFilter.frequency.cancelScheduledValues(0);
+      biquadFilter.frequency.setTargetAtTime(
+        biquadConfig.biquadFrequency,
+        biquadConfig.areaOfEffect,
+        biquadConfig.areaOfEffect,
+      );
+    } else {
+      biquadFilter.frequency.cancelScheduledValues(0);
+      biquadFilter.frequency.value = biquadConfig.biquadFrequency;
+    }
+
+    biquadFilter.Q.value = biquadConfig.quality;
+    biquadFilter.detune.cancelScheduledValues(0);
+    biquadFilter.detune.value = biquadConfig.detune;
+
+    return biquadFilter;
   }
 
   detune({ config, source, }) {
