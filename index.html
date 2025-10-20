@@ -65,7 +65,13 @@
       <synth-display></synth-display>
       <synth-waveform></synth-waveform>
       <section id="effects">
-        <h4>Effects</h4>
+        <div class="section-heading">
+          <h4>Effects</h4>
+          <synth-segmented
+            name="effectsChainMode"
+            options='[{"value":"series","label":"Linear"},{"value":"parallel","label":"Parallel"}]'
+          ></synth-segmented>
+        </div>
          <div class="synth-effect">
           <synth-switch name="effects.bitcrusher.active" label="Bitcrusher"></synth-switch>
           <div class="synth-controls">

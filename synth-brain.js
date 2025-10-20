@@ -27,6 +27,7 @@ export default class SynthBrain extends HTMLElement {
     this.audioGrains = [];
     this.imageGrains = [];
     this.config = {
+      effectsChainMode: 'series',
       effects: {
         delay: {
           active: false,
@@ -246,6 +247,10 @@ export default class SynthBrain extends HTMLElement {
     }
 
     let nextValue = value;
+
+    if (name === 'effectsChainMode') {
+      nextValue = value === 'parallel' ? 'parallel' : 'series';
+    }
 
     if (name === 'grainDuration') {
       if (typeof nextValue !== 'number') {

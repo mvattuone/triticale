@@ -10,5 +10,6 @@ import "./synth-waveform.js";
 import "./play-button.js";
 import "./synth-ribbon.js";
 import "./synth-joystick.js";
+import "./synth-segmented.js";
 
 export function App() {}
