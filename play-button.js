@@ -12,14 +12,16 @@ export default class PlayButton extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: center;
-          height: var(--play-button-size, 100px);
+          height: var(--play-button-height, 72px);
+          width: var(--play-button-width, 160px);
           flex: 0 0 auto;
         }
 
         button {
           position: relative;
-          width: var(--play-button-size, 100px);
-          height: var(--play-button-size, 100px);
+          width: var(--play-button-width, 160px);
+          height: var(--play-button-height, 72px);
+          border-radius: var(--play-button-border-radius, 999px);
           border: 1px solid rgba(87, 42, 9, 0.85);
           background:
             linear-gradient(
@@ -118,8 +120,8 @@ export default class PlayButton extends HTMLElement {
         }
 
         .icon {
-          width: 38px;
-          height: 38px;
+          width: calc(var(--play-button-height, 72px) - 24px);
+          height: calc(var(--play-button-height, 72px) - 24px);
           position: relative;
           display: inline-flex;
           align-items: center;
