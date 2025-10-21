@@ -23,137 +23,59 @@
   <body>
     <synth-brain>
       <main>
-      <section id="granulation">
-        <div class="section-heading">
-          <h4>Granulation</h4>
-        </div>
-        <div class="synth-controls">
-        <synth-dial
-          name="grainDuration"
-          min="1"
-          max="1000"
-          label="Duration"
-        ></synth-dial>
-        <synth-dial
-          name="density"
-          min="1"
-          max="128"
-          label="Density"
-        ></synth-dial>
-        <synth-dial
-          name="window"
-          min="1"
-          max="10"
-          label="Window"
-          step="0.1"
-        ></synth-dial>
-        <synth-dial
-          name="spray"
-          min="1"
-          max="128"
-          label="Spray"
-          step="1"
-        ></synth-dial>
-        <synth-dial
-          name="random"
-          min="0"
-          max="1"
-          step="0.25"
-          label="Random"
-          format="percent"
-        ></synth-dial>
-        </div>
-      </section>
       <synth-display></synth-display>
       <synth-waveform></synth-waveform>
       <section id="effects">
         <div class="section-heading">
           <h4>Effects</h4>
+        <synth-section id="granulation" label="Granulation">
+          <div class="synth-controls">
+            <synth-dial name="grainDuration" min="1" max="1000" label="Duration"></synth-dial>
+            <synth-dial name="density" min="1" max="128" label="Density"></synth-dial>
+            <synth-dial name="window" min="1" max="10" label="Window" step="0.1"></synth-dial>
+            <synth-dial name="spray" min="1" max="128" label="Spray" step="1"></synth-dial>
+            <synth-dial name="random" min="0" max="1" step="0.25" label="Random" format="percent"></synth-dial>
+          </div>
+        </synth-section>
+        <synth-section id="effects" label="Effects">
           <synth-segmented
+            slot="heading-action"
             name="effectsChainMode"
             options='[{"value":"series","label":"Linear"},{"value":"parallel","label":"Parallel"}]'
           ></synth-segmented>
-        </div>
-        <div class="synth-effects">
-         <div class="synth-effect">
-          <synth-switch name="effects.bitcrusher.active" label="Bitcrusher"></synth-switch>
-          <div class="synth-controls">
-          <synth-dial
-            min="0"
-            max="16"
-            step="4"
-            name="effects.bitcrusher.bits"
-            label="Bits"
-          ></synth-dial>
-          <synth-dial
-            min="0.0001"
-            max="1"dial
-            step="0.001"
-            name="effects.bitcrusher.normfreq"
-            label="Norm Freq"
-          ></synth-dial>
+          <div class="synth-effects">
+            <div class="synth-effect">
+              <synth-switch name="effects.bitcrusher.active" label="Bitcrusher"></synth-switch>
+              <div class="synth-controls">
+                <synth-dial name="effects.bitcrusher.bits" min="0" max="16" step="4" label="Bits"></synth-dial>
+                <synth-dial name="effects.bitcrusher.normfreq" min="0.0001" max="1" step="0.001" label="Norm Freq"></synth-dial>
+              </div>
+            </div>
+            <div class="synth-effect">
+              <synth-switch name="effects.delay.active" label="Delay"></synth-switch>
+              <div class="synth-controls">
+                <synth-dial name="effects.delay.feedback" min="0" max="1" step="0.01" label="Feedback"></synth-dial>
+                <synth-dial name="effects.delay.time" min="0" max="1" step="0.01" label="Time"></synth-dial>
+                <synth-dial name="effects.delay.mix" min="0" max="1" step="0.01" label="Mix"></synth-dial>
+              </div>
+            </div>
+            <div class="synth-effect">
+              <div class="section-heading">
+                <synth-switch name="effects.biquad.active" label="Filter"></synth-switch>
+                <synth-select
+                  name="effects.biquad.type"
+                  options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
+                ></synth-select>
+              </div>
+              <div class="synth-controls">
+                <synth-dial name="effects.biquad.biquadFrequency" min="20" max="22050" step="1" label="Frequency"></synth-dial>
+                <synth-dial name="effects.biquad.quality" min="0" max="20" step="0.1" label="Quality"></synth-dial>
+                <synth-dial name="effects.biquad.randomValues" min="0" max="100" step="1" label="Random"></synth-dial>
+              </div>
+            </div>
           </div>
+        </synth-section>
         </div>
-        <div class="synth-effect">
-          <synth-switch name="effects.delay.active" label="Delay"></synth-switch>
-          <div class="synth-controls">
-            <synth-dial
-              min="0"
-              max="1"
-              step="0.01"
-              name="effects.delay.feedback"
-              label="Feedback"
-            ></synth-dial>
-            <synth-dial
-              min="0"
-              max="1"
-              step="0.01"
-              name="effects.delay.time"
-              label="Time"
-            ></synth-dial>
-            <synth-dial
-              min="0"
-              max="1"
-              step="0.01"
-              name="effects.delay.mix"
-              label="Mix"
-            ></synth-dial>
-          </div>
-        </div>
-        <div class="synth-effect">
-          <div class="section-heading">
-          <synth-switch name="effects.biquad.active" label="Filter"></synth-switch>
-          <synth-select
-            name="effects.biquad.type"
-            options='[{"value": "lowpass", "label": "Lowpass"}, {"value": "highpass", "label": "Highpass"}, {"value": "bandpass", "label": "Bandpass"}]'
-          ></synth-select>
-          </div>
-          <div class="synth-controls">
-            <synth-dial
-              min="20"
-              max="22050"
-              step="1"
-              name="effects.biquad.biquadFrequency"
-              label="Frequency"
-            ></synth-dial>
-            <synth-dial
-              min="0"
-              max="20"
-              step="0.1"
-              name="effects.biquad.quality"
-              label="Quality"
-            ></synth-dial>
-            <synth-dial
-              min="0"
-              max="100"
-              step="1"
-              name="effects.biquad.randomValues"
-              label="Random"
-            ></synth-dial>
-          </div>
-        </div>
-        </div>
-      </section>
     <section id="joystick">
         <synth-joystick
           name="effects.detune.value"
