@@ -23,12 +23,13 @@ main  {
   height: 100vh;
   column-gap: 24px;
   grid-template-columns: 24px minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr) 24px;
-  grid-template-rows: 24px minmax(0, 4fr) minmax(0, 1fr) minmax(0, 1fr) 24px;
+  grid-template-rows: 24px minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 24px;
   grid-template-areas:
     ". . . . ."
     ". granulation display effects ."
-    ". joystick waveform . ."
-    ". joystick ribbon transport .";
+    ". transport display effects ."
+    ". joystick waveform logo ."
+    ". joystick ribbon logo .";
 }
 
 #granulation {
@@ -49,6 +50,18 @@ main  {
 
 #transport {
   grid-area: transport;
+}
+
+#logo {
+  grid-area: logo;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#logo img {
+  max-width: 100%;
+  height: auto;
 }
 
 .section-heading {
@@ -114,6 +127,5 @@ synth-waveform {
 @supports (height: 100dvh) {
   main { 
     height: 100dvh;
-    grid-template-rows: 24px minmax(0, 4fr) minmax(0, 1fr) minmax(0, 1fr) 24px;
   }
 }

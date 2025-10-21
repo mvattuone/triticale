@@ -23,11 +23,6 @@
   <body>
     <synth-brain>
       <main>
-      <synth-display></synth-display>
-      <synth-waveform></synth-waveform>
-      <section id="effects">
-        <div class="section-heading">
-          <h4>Effects</h4>
         <synth-section id="granulation" label="Granulation">
           <div class="synth-controls">
             <synth-dial name="grainDuration" min="1" max="1000" label="Duration"></synth-dial>
@@ -37,6 +32,11 @@
             <synth-dial name="random" min="0" max="1" step="0.25" label="Random" format="percent"></synth-dial>
           </div>
         </synth-section>
+        <section id="transport">
+          <play-button></play-button>
+        </section>
+        <synth-display></synth-display>
+        <synth-waveform></synth-waveform>
         <synth-section id="effects" label="Effects">
           <synth-segmented
             slot="heading-action"
@@ -75,24 +75,17 @@
             </div>
           </div>
         </synth-section>
+        <section id="joystick">
+          <synth-joystick name="effects.detune.value" min="-1200" max="1200" label="Pitch"></synth-joystick>
+        </section>
+        <section id="ribbon">
+          <synth-ribbon></synth-ribbon>
+        </section>
+        <div id="logo">
+          <img src="./logo.png" id="synth-logo" alt="Triticale logo" />
         </div>
-    <section id="joystick">
-        <synth-joystick
-          name="effects.detune.value"
-          min="-1200"
-          max="1200"
-          label="Pitch"
-        ></synth-joystick>
-    </section>
-    <section id="ribbon">
-      <synth-ribbon></synth-ribbon>
-    </section>
-    <section id="transport">
-      <play-button></play-button>
-    </section>
       </main>
     </synth-brain>
-
     <script type="importmap">
       {
         "imports": {
