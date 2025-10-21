@@ -11,5 +11,6 @@ import "./play-button.js";
 import "./synth-ribbon.js";
 import "./synth-joystick.js";
 import "./synth-segmented.js";
+import "./synth-section.js";
 
 export function App() {}
