@@ -10,6 +10,14 @@ body {
   height: 100vh;
 }
 
+synth-brain {
+  background: #111417;
+  color: #f1f4f3;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  min-height: 100vh;
+  width: 100%;
+}
+
 main  {
   display: grid;
   height: 100vh;
