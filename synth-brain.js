@@ -90,14 +90,15 @@ export default class SynthBrain extends HTMLElement {
     this.processedAudioSelection = null;
     this.processedAudioSelectionPromise = null;
     this.notifyGrainCounts();
+    this.isLatched = false;
+    this.ribbonEngaged = false;
   }
 
   connectedCallback() {
     this.addEventListener("image-uploaded", this.handleImageUploaded);
     this.addEventListener("image-cleared", this.handleImageCleared);
     this.addEventListener("update-sample", this.updateAudioSelection);
-    this.addEventListener("play-synth", this.playSynth);
-    this.addEventListener("stop-synth", this.stopSynth);
+    this.addEventListener("latch-changed", this.handleLatchChanged);
     this.addEventListener("update-config", this.handleUpdateConfig);
     this.addEventListener("audio-cleared", this.handleAudioCleared);
   }
@@ -106,10 +107,33 @@ export default class SynthBrain extends HTMLElement {
     this.removeEventListener("image-uploaded", this.handleImageUploaded);
     this.removeEventListener("image-cleared", this.handleImageCleared);
     this.removeEventListener("update-sample", this.updateAudioSelection);
-    this.removeEventListener("play-synth", this.playSynth);
-    this.removeEventListener("stop-synth", this.stopSynth);
+    this.removeEventListener("latch-changed", this.handleLatchChanged);
     this.removeEventListener("update-config", this.handleupdateConfig);
     this.removeEventListener("audio-cleared", this.handleAudioCleared);
+  }
+
+  handleLatchChanged = (event) => {
+    const { active } = event.detail ?? {};
+    const nextLatched = Boolean(active);
+    this.isLatched = nextLatched;
+
+    if (!this.isLatched && !this.ribbonEngaged) {
+      this.stopSynth();
+    }
+  };
+
+  beginRibbonInteraction() {
+    this.ribbonEngaged = true;
+    if (!this.isPlaying) {
+      this.playSynth();
+    }
+  }
+
+  endRibbonInteraction() {
+    this.ribbonEngaged = false;
+    if (!this.isLatched) {
+      this.stopSynth();
+    }
   }
 
 
@@ -869,6 +893,7 @@ export default class SynthBrain extends HTMLElement {
 
     this.clearPlayTimers();
     this.isPlaying = false;
+    this.ribbonEngaged = false;
 
     if (this.image) {
       const updateImageEvent = new CustomEvent("update-image", {
