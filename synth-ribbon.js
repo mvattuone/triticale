@@ -181,8 +181,11 @@ export default class SynthRibbon extends HTMLElement {
 
   handlePointerDown(event) {
     event.preventDefault();
-    if (!this.isPlaybackActive() || !this.hasGrains) {
+    if (!this.hasGrains) {
       return;
+    }
+    if (this.synthBrain && typeof this.synthBrain.beginRibbonInteraction === 'function') {
+      this.synthBrain.beginRibbonInteraction();
     }
     this.ribbon.setPointerCapture(event.pointerId);
     this.pointerId = event.pointerId;
@@ -191,7 +194,7 @@ export default class SynthRibbon extends HTMLElement {
   }
 
   handlePointerMove(event) {
-    if (!this.active || event.pointerId !== this.pointerId || !this.isPlaybackActive() || !this.hasGrains) {
+    if (!this.active || event.pointerId !== this.pointerId || !this.hasGrains) {
       return;
     }
     this.updateFromEvent(event);
@@ -247,6 +250,9 @@ export default class SynthRibbon extends HTMLElement {
       }
     }
     this.pointerId = null;
+    if (this.active && this.synthBrain && typeof this.synthBrain.endRibbonInteraction === 'function') {
+      this.synthBrain.endRibbonInteraction();
+    }
     this.active = false;
   }
 

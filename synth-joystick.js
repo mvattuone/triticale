@@ -202,7 +202,7 @@ export default class SynthJoystick extends HTMLElement {
 .actions { display: flex; gap: 10px; }
 .random-button {
   font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
-  padding: 6px 18px; border-radius: 18px;
+  padding: 6px 18px; border-radius: 0;
   border: 1px solid rgba(255,122,45,.35);
   background: rgba(32,22,14,.5);
   color: rgba(255,214,190,.92); cursor: pointer;
