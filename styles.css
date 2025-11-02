@@ -54,14 +54,13 @@ main  {
 
 #logo {
   grid-area: logo;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  text-align: center;
+  place-self: center;
 }
 
 #logo img {
   max-width: 100%;
-  height: auto;
+  max-height: 100%;
 }
 
 .section-heading {
