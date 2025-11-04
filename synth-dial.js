@@ -123,34 +123,22 @@ export default class SynthDial extends HTMLElement {
             2px 2px 4px rgba(0, 0, 0, 0.4),
             inset 1px 1px 2px rgba(80, 80, 80, 0.3);
         }
-        
-        .value-input {
+
+        output {
+          display: grid;
+          place-items: center;
           font-family: monospace;
-          font-size: 13px;
+          font-size: 10px;
           color: #fff;
-          text-align: center;
-          min-width: 60px;
-          background: rgba(0, 0, 0, 0.35);
-          border-radius: 4px;
-          padding: 2px 6px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+          min-width: 40px;
+          height: 100%;
         }
-        .value-input:focus {
-          outline: none;
-          border-color: rgba(102, 220, 255, 0.8);
-          box-shadow: 0 0 4px rgba(102, 220, 255, 0.6);
-        }
-        .value-input::-webkit-outer-spin-button,
-        .value-input::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        .value-input[type="number"] {
-          -moz-appearance: textfield;
+        
+        input {
+          display: none;
         }
 
-        .label {
+        label {
           font-family: sans-serif;
           font-size: 11px;
           color: #ccc;
@@ -165,11 +153,13 @@ export default class SynthDial extends HTMLElement {
           <div class="dial-indicator">
             <div class="indicator-line"></div>
           </div>
-          <div class="dial-center"></div>
+        <div class="dial-center">
+          <output for=${inputName}>${value}</output>
+        </div>
         </div>
       </div>
-      <input class="value-input" type="number" min="${min}" max="${max}" step="${step}" value="${value}" />
-      <label class="label">${label}</label>
+      <input name=${inputName} type="number" min="${min}" max="${max}" step="${step}" value="${value}" />
+      <label>${label}</label>
     `;
 
     ensureBoxSizing(this.shadowRoot);
@@ -197,7 +187,7 @@ export default class SynthDial extends HTMLElement {
 
     this.dialContainer = this.shadowRoot.querySelector('.dial-container');
     this.dialIndicator = this.shadowRoot.querySelector('.dial-indicator');
-    this.valueInput = this.shadowRoot.querySelector('.value-input');
+    this.valueOutput = this.shadowRoot.querySelector('output');
     this.ticksContainer = this.shadowRoot.querySelector('.dial-ticks');
 
     this.isDragging = false;
@@ -205,9 +195,9 @@ export default class SynthDial extends HTMLElement {
     this.startValue = 0;
 
     if (this.percentMode) {
-      this.valueInput.setAttribute('inputmode', 'decimal');
-      this.valueInput.setAttribute('pattern', '[0-9]*\\.?[0-9]*');
-      this.valueInput.setAttribute('placeholder', '0.0');
+      this.valueOutput.setAttribute('inputmode', 'decimal');
+      this.valueOutput.setAttribute('pattern', '[0-9]*\\.?[0-9]*');
+      this.valueOutput.setAttribute('placeholder', '0.0');
     }
 
     this.createTicks();
@@ -220,9 +210,6 @@ export default class SynthDial extends HTMLElement {
     this.handleTouchMove = this.handleTouchMove.bind(this);
     this.handleTouchEnd = this.handleTouchEnd.bind(this);
     this.handleConfigUpdated = this.handleConfigUpdated.bind(this);
-    this.handleValueInputChange = this.handleValueInputChange.bind(this);
-    this.handleValueInputKeyDown = this.handleValueInputKeyDown.bind(this);
-    this.handleValueInputFocus = this.handleValueInputFocus.bind(this);
   }
   
   createTicks() {
@@ -248,9 +235,7 @@ export default class SynthDial extends HTMLElement {
   updateRotation() {
     const angle = this.valueToAngle(this.value);
     this.dialIndicator.style.transform = `rotate(${angle}deg)`;
-    if (this.valueInput) {
-      this.valueInput.value = this.formatValue(this.value);
-    }
+    this.valueOutput.value = this.formatValue(this.value);
   }
 
   formatValue(value) {
@@ -332,26 +317,6 @@ export default class SynthDial extends HTMLElement {
     if (emit) {
       this.dispatchChangeEvent();
     }
-  }
-
-  handleValueInputChange() {
-    this.commitValueChange(this.valueInput.value, true);
-  }
-
-  handleValueInputKeyDown(event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      this.commitValueChange(this.valueInput.value, true);
-      this.valueInput.blur();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      this.valueInput.value = this.formatValue(this.value);
-      this.valueInput.blur();
-    }
-  }
-
-  handleValueInputFocus(event) {
-    event.target.select();
   }
   
   handleMouseDown(e) {
@@ -479,11 +444,6 @@ export default class SynthDial extends HTMLElement {
   connectedCallback() {
     this.dialContainer.addEventListener('mousedown', this.handleMouseDown);
     this.dialContainer.addEventListener('touchstart', this.handleTouchStart, { passive: false });
-    if (this.valueInput) {
-      this.valueInput.addEventListener('change', this.handleValueInputChange);
-      this.valueInput.addEventListener('keydown', this.handleValueInputKeyDown);
-      this.valueInput.addEventListener('focus', this.handleValueInputFocus);
-    }
     this.synthBrain = this.closest("synth-brain");
     if (this.synthBrain) {
       this.synthBrain.addEventListener("config-updated", this.handleConfigUpdated);
@@ -493,11 +453,6 @@ export default class SynthDial extends HTMLElement {
   disconnectedCallback() {
     this.dialContainer.removeEventListener('mousedown', this.handleMouseDown);
     this.dialContainer.removeEventListener('touchstart', this.handleTouchStart);
-    if (this.valueInput) {
-      this.valueInput.removeEventListener('change', this.handleValueInputChange);
-      this.valueInput.removeEventListener('keydown', this.handleValueInputKeyDown);
-      this.valueInput.removeEventListener('focus', this.handleValueInputFocus);
-    }
     document.removeEventListener('mousemove', this.handleMouseMove);
     document.removeEventListener('mouseup', this.handleMouseUp);
     document.removeEventListener('touchmove', this.handleTouchMove);

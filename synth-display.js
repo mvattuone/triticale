@@ -386,6 +386,9 @@ class SynthDisplay extends HTMLElement {
       this.overlayCanvas.height = this.overlayCanvas.height;
     }
     this.image = null;
+    this.noiseCanvas = null;
+    this.noiseContext = null;
+    this.noiseImageData = null;
     this.displayContainer?.classList.remove("has-image");
     this.showRandomImageButton();
     this.setImageControlsDisabled(false);
