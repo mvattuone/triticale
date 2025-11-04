@@ -56,7 +56,8 @@ export default class SynthRibbon extends HTMLElement {
           top: 0;
           bottom: 0;
           width: calc(100% / var(--segments, 1));
-          left: calc(var(--indicator-index, 0) * (100% / var(--segments, 1)));
+          transform: translate3d(calc(var(--indicator-index, 0) * 100%), 0, 0);
+          will-change: transform;
           background: linear-gradient(180deg, rgba(60, 255, 174, 0.95), rgba(42, 215, 247, 0.8));
           box-shadow:
             inset 0 0 10px rgba(15, 255, 200, 0.45),
@@ -64,8 +65,12 @@ export default class SynthRibbon extends HTMLElement {
             0 0 34px rgba(80, 255, 180, 0.25);
           pointer-events: none;
           transition:
-            left 0.08s ease-out,
+            transform 0.08s ease-out,
             width 0.08s ease-out;
+        }
+
+        :host([data-dragging="true"]) .indicator {
+          transition: none;
         }
 
         :host([data-empty="true"]) .ribbon {
@@ -120,6 +125,9 @@ export default class SynthRibbon extends HTMLElement {
     this.pointerId = null;
     this.synthBrain = null;
     this.hasGrains = false;
+    this.suppressExternalUpdates = false;
+    this.pendingExternalIndex = null;
+    this.externalSyncHandle = null;
   }
 
   connectedCallback() {
@@ -169,6 +177,11 @@ export default class SynthRibbon extends HTMLElement {
       this.synthBrain.removeEventListener('config-updated', this.boundConfigUpdated);
       this.synthBrain.removeEventListener('grain-count-changed', this.boundGrainCountChanged);
     }
+
+    if (this.externalSyncHandle !== null) {
+      cancelAnimationFrame(this.externalSyncHandle);
+      this.externalSyncHandle = null;
+    }
   }
 
   handleDrawGrain(e) {
@@ -176,7 +189,7 @@ export default class SynthRibbon extends HTMLElement {
       return;
     }
     const { grainIndex = 0 } = e.detail;
-    this.updateIndicator(grainIndex); 
+    this.handleExternalIndex(grainIndex);
   }
 
   handlePointerDown(event) {
@@ -187,9 +200,16 @@ export default class SynthRibbon extends HTMLElement {
     if (this.synthBrain && typeof this.synthBrain.beginRibbonInteraction === 'function') {
       this.synthBrain.beginRibbonInteraction();
     }
+    if (this.externalSyncHandle !== null) {
+      cancelAnimationFrame(this.externalSyncHandle);
+      this.externalSyncHandle = null;
+    }
     this.ribbon.setPointerCapture(event.pointerId);
     this.pointerId = event.pointerId;
     this.active = true;
+    this.suppressExternalUpdates = true;
+    this.pendingExternalIndex = null;
+    this.setAttribute('data-dragging', 'true');
     this.updateFromEvent(event);
   }
 
@@ -254,6 +274,8 @@ export default class SynthRibbon extends HTMLElement {
       this.synthBrain.endRibbonInteraction();
     }
     this.active = false;
+    this.removeAttribute('data-dragging');
+    this.scheduleExternalSync();
   }
 
   setIndex(index) {
@@ -335,9 +357,8 @@ export default class SynthRibbon extends HTMLElement {
     if (Number.isNaN(numericValue)) {
       return;
     }
-    this.currentIndex = Math.max(1, Math.min(Math.round(numericValue), this.segments));
-    this.updateIndicator(this.currentIndex - 1);
-    this.updateValueDisplay();
+    const clamped = Math.max(1, Math.min(Math.round(numericValue), this.segments));
+    this.handleExternalIndex(clamped - 1);
   }
 
   handleGrainCountChanged(event) {
@@ -363,6 +384,44 @@ export default class SynthRibbon extends HTMLElement {
 
   isPlaybackActive() {
     return Boolean(this.synthBrain && this.synthBrain.isPlaying);
+  }
+
+  handleExternalIndex(index) {
+    if (!this.hasGrains || typeof index !== 'number') {
+      return;
+    }
+    const clampedIndex = Math.max(0, Math.min(Math.round(index), this.segments - 1));
+    if (this.suppressExternalUpdates) {
+      this.pendingExternalIndex = clampedIndex;
+      return;
+    }
+    this.applyExternalIndex(clampedIndex);
+  }
+
+  applyExternalIndex(clampedIndex) {
+    this.pendingExternalIndex = null;
+    this.updateIndicator(clampedIndex);
+    this.currentIndex = clampedIndex + 1;
+    this.updateValueDisplay();
+  }
+
+  scheduleExternalSync() {
+    if (!this.hasGrains) {
+      this.suppressExternalUpdates = false;
+      this.pendingExternalIndex = null;
+      return;
+    }
+    this.suppressExternalUpdates = true;
+    if (this.externalSyncHandle !== null) {
+      cancelAnimationFrame(this.externalSyncHandle);
+    }
+    this.externalSyncHandle = requestAnimationFrame(() => {
+      this.externalSyncHandle = null;
+      this.suppressExternalUpdates = false;
+      if (typeof this.pendingExternalIndex === 'number') {
+        this.applyExternalIndex(this.pendingExternalIndex);
+      }
+    });
   }
 }
 

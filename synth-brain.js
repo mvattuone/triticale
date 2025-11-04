@@ -93,6 +93,15 @@ export default class SynthBrain extends HTMLElement {
     this.notifyGrainCounts();
     this.isLatched = false;
     this.ribbonEngaged = false;
+    this.imageRenderToken = 0;
+    this.imageRenderInFlight = false;
+    this.pendingImageRender = null;
+    this.currentImageRender = null;
+    this.lastRequestedImageSegment = null;
+    this.lastFaviconUpdate = 0;
+    this.faviconUpdateInterval = 250;
+    this.imageRenderCacheVersion = 0;
+    this.imageRenderCache = new Map();
   }
 
   connectedCallback() {
@@ -348,6 +357,7 @@ export default class SynthBrain extends HTMLElement {
     }
 
     if (name === 'grainDuration') {
+      this.invalidateImageRenderState();
       if (this.imageBuffer) {
         this.imageGrains = this.createGrains(this.imageBuffer, 'image');
       }
@@ -365,6 +375,7 @@ export default class SynthBrain extends HTMLElement {
         this.databender.updateConfig(effectKey, valueKey, nextValue);
       }
       this.invalidateProcessedAudio();
+      this.invalidateImageRenderState();
     }
 
     if (name === 'grainIndex' && this.isPlaying) {
@@ -504,6 +515,7 @@ export default class SynthBrain extends HTMLElement {
 
     this.databender.convert(image).then((buffer) => {
       this.imageBuffer = buffer;
+      this.invalidateImageRenderState();
       this.imageGrains = this.createGrains(this.imageBuffer, 'image');
       this.notifyGrainCounts();
     });
@@ -514,7 +526,46 @@ export default class SynthBrain extends HTMLElement {
     this.imageGrains = [];
     this.imageNumberOfGrains = 0;
     this.imageSamplesPerGrain = 0;
+    this.invalidateImageRenderState();
+    if (this.databender) {
+      this.databender.imageData = null;
+    }
     this.notifyGrainCounts();
+  }
+
+  resetImageRenderQueue() {
+    this.pendingImageRender = null;
+    this.currentImageRender = null;
+    this.imageRenderInFlight = false;
+    this.lastRequestedImageSegment = null;
+    this.imageRenderToken = 0;
+  }
+
+  invalidateImageRenderState() {
+    this.resetImageRenderQueue();
+    this.imageRenderCacheVersion = (this.imageRenderCacheVersion + 1) % Number.MAX_SAFE_INTEGER;
+    this.imageRenderCache = new Map();
+  }
+
+  getCachedImageRender(cacheKey) {
+    if (!cacheKey) {
+      return null;
+    }
+    const entry = this.imageRenderCache.get(cacheKey);
+    if (!entry || entry.version !== this.imageRenderCacheVersion) {
+      return null;
+    }
+    return entry.buffer || null;
+  }
+
+  setCachedImageRender(cacheKey, buffer) {
+    if (!cacheKey || !buffer) {
+      return;
+    }
+    this.imageRenderCache.set(cacheKey, {
+      version: this.imageRenderCacheVersion,
+      buffer,
+    });
   }
 
   createGrains(sample, sampleType = 'audio') {
@@ -526,6 +577,7 @@ export default class SynthBrain extends HTMLElement {
 
     this.samplesPerGrain = Math.max(1, Math.floor(sample.length / this.numberOfGrains));
     if (mode === 'image') {
+      this.invalidateImageRenderState();
       this.imageNumberOfGrains = this.numberOfGrains;
       this.imageSamplesPerGrain = this.samplesPerGrain;
     } else {
@@ -582,10 +634,25 @@ export default class SynthBrain extends HTMLElement {
 
   updateAudioSelection(e) {
     const { selection, buffer } = e.detail;
-    const frameCount =
-      selection.end > selection.start
-        ? selection.end - selection.start
-        : selection.start - selection.end;
+    if (!buffer || typeof buffer.getChannelData !== "function") {
+      return;
+    }
+
+    const bufferLength = buffer.length || 0;
+    if (!Number.isFinite(bufferLength) || bufferLength <= 0) {
+      return;
+    }
+
+    const rawStart = Number(selection.start ?? 0);
+    const rawEnd = Number(selection.end ?? bufferLength);
+    const startSample = Math.min(Math.max(Math.min(rawStart, rawEnd), 0), Math.max(bufferLength - 1, 0));
+    let endSample = Math.min(Math.max(Math.max(rawStart, rawEnd), 0), bufferLength);
+
+    if (endSample <= startSample) {
+      endSample = Math.min(bufferLength, startSample + 1);
+    }
+
+    const frameCount = Math.max(1, endSample - startSample);
     const numberOfChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
 
@@ -599,7 +666,8 @@ export default class SynthBrain extends HTMLElement {
       const originalData = buffer.getChannelData(channel);
       const newData = this.audioSelection.getChannelData(channel);
       for (let i = 0; i < frameCount; i++) {
-        newData[i] = originalData[i + selection.start];
+        const sourceIndex = startSample + i;
+        newData[i] = sourceIndex < originalData.length ? originalData[sourceIndex] : 0;
       }
     }
 
@@ -687,53 +755,193 @@ export default class SynthBrain extends HTMLElement {
     if (!this.imageGrains.length) {
       return;
     }
+    const nextRequest = {
+      segmentIndex,
+      segmentCount: Math.max(1, segmentCount),
+    };
+    this.pendingImageRender = { ...nextRequest };
+    this.lastRequestedImageSegment = { ...nextRequest };
+    if (!this.imageRenderInFlight) {
+      this.processNextImageRender();
+    }
+  }
+
+  processNextImageRender() {
+    if (!this.pendingImageRender) {
+      this.imageRenderInFlight = false;
+      return;
+    }
+
+    const request = this.pendingImageRender;
+    this.pendingImageRender = null;
+    const { segmentIndex, segmentCount } = request;
+
+    if (!this.imageGrains.length) {
+      this.imageRenderInFlight = false;
+      return;
+    }
+
     const display = document.querySelector("synth-display");
     const canvas = display?.shadowRoot?.querySelector("canvas");
     if (!canvas) {
+      this.imageRenderInFlight = false;
       return;
     }
     const context = canvas.getContext("2d");
     if (!context) {
+      this.imageRenderInFlight = false;
       return;
     }
 
     const imageIndex = this.mapSegmentToImageIndex(segmentIndex, segmentCount);
     const clampedIndex = Math.max(0, Math.min(imageIndex, this.imageGrains.length - 1));
     const grainBuffer = this.imageGrains[clampedIndex];
+    if (!grainBuffer) {
+      this.imageRenderInFlight = false;
+      if (this.pendingImageRender) {
+        this.processNextImageRender();
+      }
+      return;
+    }
 
     const grainsCount = Math.max(1, this.imageNumberOfGrains || this.imageGrains.length);
+    const cacheKey = `${clampedIndex}`;
+    const cachedBuffer = this.getCachedImageRender(cacheKey);
 
-    this.databender
-      .render(grainBuffer)
-      .then((buffer) => {
-        this.applyBitcrusherVisuals(buffer);
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        this.databender.draw(
-          buffer,
-          context,
-          0,
-          0,
-          0,
-          0,
-          this.databender.imageData.width,
-          this.databender.imageData.height / grainsCount,
-          canvas.width,
-          canvas.height,
-        );
+    this.imageRenderInFlight = true;
 
-        document.querySelector('link[rel="icon"]').setAttribute('href', canvas.toDataURL('image/png'));
-
-        const drawGrainEvent = new CustomEvent('draw-grain', {
-          detail: {
-            grainIndex: segmentIndex,
-            segmentCount,
-            grains: this.imageGrains,
-          },
-          bubbles: true,
-          composed: true,
-        });
-        document.querySelector('synth-ribbon')?.dispatchEvent(drawGrainEvent);
+    if (cachedBuffer) {
+      this.drawProcessedImageBuffer({
+        buffer: cachedBuffer,
+        context,
+        canvas,
+        grainsCount,
+        segmentIndex,
+        segmentCount,
       });
+      this.currentImageRender = null;
+      this.imageRenderInFlight = false;
+      if (this.pendingImageRender) {
+        this.processNextImageRender();
+      }
+      return;
+    }
+
+    const requestId = ++this.imageRenderToken;
+    this.currentImageRender = {
+      requestId,
+      segmentIndex,
+      segmentCount,
+      cacheKey,
+    };
+
+    Promise.resolve(this.databender.render(grainBuffer))
+      .then((buffer) => {
+        if (!this.currentImageRender || this.currentImageRender.requestId !== requestId) {
+          return;
+        }
+        this.applyBitcrusherVisuals(buffer);
+        this.setCachedImageRender(cacheKey, buffer);
+        const latest = this.lastRequestedImageSegment;
+        const isLatestRequest = latest
+          && latest.segmentIndex === segmentIndex
+          && latest.segmentCount === segmentCount;
+        if (isLatestRequest) {
+          this.drawProcessedImageBuffer({
+            buffer,
+            context,
+            canvas,
+            grainsCount,
+            segmentIndex,
+            segmentCount,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to render image grain', error);
+      })
+      .finally(() => {
+        if (!this.currentImageRender || this.currentImageRender.requestId !== requestId) {
+          return;
+        }
+        this.currentImageRender = null;
+        this.imageRenderInFlight = false;
+        if (this.pendingImageRender) {
+          this.processNextImageRender();
+        }
+      });
+  }
+
+  drawProcessedImageBuffer({ buffer, context, canvas, grainsCount, segmentIndex, segmentCount }) {
+    if (!buffer || !context || !canvas) {
+      return;
+    }
+    const imageData = this.databender?.imageData;
+    if (!imageData || !imageData.width || !imageData.height) {
+      return;
+    }
+    const { width: targetWidth, height: targetHeight } = canvas;
+    const sourceWidth = imageData.width;
+    const sourceHeight = imageData.height;
+    const sliceHeight = grainsCount > 0 ? sourceHeight / grainsCount : sourceHeight;
+
+    context.clearRect(0, 0, targetWidth, targetHeight);
+    this.databender.draw(
+      buffer,
+      context,
+      0,
+      0,
+      0,
+      0,
+      sourceWidth,
+      sliceHeight,
+      targetWidth,
+      targetHeight,
+    );
+
+    this.updateFaviconFromCanvas(canvas);
+    this.dispatchRibbonImageDraw(segmentIndex, segmentCount);
+  }
+
+  updateFaviconFromCanvas(canvas) {
+    if (!canvas) {
+      return;
+    }
+    if (this.ribbonEngaged) {
+      return;
+    }
+    const now = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+      ? performance.now()
+      : Date.now();
+    if (now - this.lastFaviconUpdate < this.faviconUpdateInterval) {
+      return;
+    }
+    const link = document.querySelector('link[rel="icon"]');
+    if (!link) {
+      return;
+    }
+    if (typeof canvas.toDataURL !== 'function') {
+      return;
+    }
+    try {
+      link.setAttribute('href', canvas.toDataURL('image/png'));
+      this.lastFaviconUpdate = now;
+    } catch (error) {
+      console.error('Failed to update favicon', error);
+    }
+  }
+
+  dispatchRibbonImageDraw(segmentIndex, segmentCount) {
+    const drawGrainEvent = new CustomEvent('draw-grain', {
+      detail: {
+        grainIndex: segmentIndex,
+        segmentCount,
+        grains: this.imageGrains,
+      },
+      bubbles: true,
+      composed: true,
+    });
+    document.querySelector('synth-ribbon')?.dispatchEvent(drawGrainEvent);
   }
 
   renderStandaloneImage() {
@@ -804,6 +1012,12 @@ export default class SynthBrain extends HTMLElement {
           gainNode.disconnect();
         } catch (disconnectError) {
           console.error('Failed to disconnect grain gain node', disconnectError);
+        }
+        try {
+          activePair.source.onended = null;
+          activePair.source.buffer = null;
+        } catch (releaseError) {
+          console.error('Failed to release finished grain buffer', releaseError);
         }
         this.activeSources.delete(activePair);
         if (this.bufferSource === activePair.source) {
@@ -884,6 +1098,12 @@ export default class SynthBrain extends HTMLElement {
           gain.disconnect();
         } catch (disconnectError) {
           console.error('Failed to disconnect grain gain node', disconnectError);
+        }
+        try {
+          source.onended = null;
+          source.buffer = null;
+        } catch (releaseError) {
+          console.error('Failed to release grain source buffer', releaseError);
         }
       });
       this.activeSources.clear();
