@@ -22,7 +22,6 @@
   </head>
   <body>
     <synth-brain>
-      <main>
         <synth-section id="granulation" label="Granulation">
           <div class="synth-controls">
             <synth-dial name="grainDuration" min="1" max="1000" label="Duration"></synth-dial>
@@ -84,7 +83,6 @@
         <div id="logo">
           <img src="./logo.png" id="synth-logo" alt="Triticale logo" />
         </div>
-      </main>
     </synth-brain>
     <script type="importmap">
       {
@@ -94,8 +92,10 @@
       }
     </script>
     <script type="module">
+      import { setPublicPath } from "./helpers/setPublicPath.js";
       import { App } from "./App.js";
 
+      setPublicPath(new URL("./", import.meta.url).href);
       App();
     </script>
   </body>

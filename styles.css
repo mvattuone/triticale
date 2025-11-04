@@ -1,26 +1,21 @@
 :host *, * {
   box-sizing: border-box;
+
+  --vw: var(--root-slot-width, 100dvw);
+  --vh: var(--root-slot-height, 100dvh);
 }
 
 body {
   margin: 0;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-  background: #111417;
-  color: #f1f4f3;
-  height: 100vh;
 }
 
 synth-brain {
   background: #111417;
   color: #f1f4f3;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-  min-height: 100vh;
-  width: 100%;
-}
-
-main  {
+  height: var(--vh);
+  width: var(--vw);
   display: grid;
-  height: 100vh;
   column-gap: 24px;
   grid-template-columns: 24px minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr) 24px;
   grid-template-rows: 24px minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 24px;
@@ -121,10 +116,4 @@ synth-waveform {
   column-gap: 24px;
   row-gap: 12px;
 
-}
-
-@supports (height: 100dvh) {
-  main { 
-    height: 100dvh;
-  }
 }

@@ -3,6 +3,7 @@ import Pizzicato from "https://cdn.jsdelivr.net/npm/pizzicato@0.6.4/+esm";
 import { chunk } from 'helpers/chunk.js';
 import { hannWindow } from 'helpers/hannWindow.js';
 import { ensureBoxSizing } from 'helpers/boxSizing.js';
+import { makeAbsoluteUrl } from 'helpers/makeAbsoluteUrl.js';
 
 function random(x, y) {
  return x+(y-x+1)*crypto.getRandomValues(new Uint32Array(1))[0]/2**32|0
@@ -14,7 +15,7 @@ const loadBitcrusherModule = (() => {
     if (!context?.audioWorklet || loadedOn.has(context)) {
       return;
     }
-    await context.audioWorklet.addModule(new URL('effects/bitcrusher.js', import.meta.url));
+    await context.audioWorklet.addModule(makeAbsoluteUrl('effects/bitcrusher.js'));
     loadedOn.add(context);
   };
 })();
