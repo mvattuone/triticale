@@ -1,4 +1,5 @@
 import { ensureBoxSizing } from 'helpers/boxSizing.js';
+import { makeAbsoluteUrl } from 'helpers/makeAbsoluteUrl.js';
 
 export default class SynthWaveform extends HTMLElement {
   constructor() {
@@ -247,18 +248,105 @@ export default class SynthWaveform extends HTMLElement {
     this.resetAudioButton = this.shadowRoot.querySelector(".control-buttons .refresh");
     this.removeAudioButton = this.shadowRoot.querySelector(".control-buttons .remove");
     this.randomAudioButtonLabel = this.randomAudioButton?.textContent || "Random audio";
-    this.remoteAudioSources = [
-      "https://archive.org/download/aporee_69834_81312/202507302277310N12113125E.mp3",
-      "https://archive.org/download/aporee_69841_81320/2509280023.mp3",
-      "https://archive.org/download/aporee_11664_13718/SBGNouMurcielagos.mp3",
-      "example.mp3",
+    this.gitHubAudioProviders = [
+      {
+        cacheKey: "mdn-webaudio-examples",
+        owner: "mdn",
+        repo: "webaudio-examples",
+        branch: "main",
+        filterRegex: /\.(mp3|wav|ogg)$/i,
+      },
+      {
+        cacheKey: "googlechromelabs-web-audio-samples",
+        owner: "GoogleChromeLabs",
+        repo: "web-audio-samples",
+        branch: "main",
+        filterRegex: /\.(mp3|wav|ogg)$/i,
+        pathRegex: /^src\/demos\/mld-drum-sampler\/samples\//i,
+      },
     ];
-    this.archiveCollectionId = "radio-aporee-maps";
+    this.gitHubAudioCache = new Map();
+    this.gitHubAudioPromises = new Map();
+    const builtInFallbackSources = [
+      "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-analyser/viper.mp3",
+      "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-basics/outfoxing.mp3",
+      "https://raw.githubusercontent.com/mdn/webaudio-examples/main/voice-change-o-matic/audio/concert-crowd.mp3",
+      "https://raw.githubusercontent.com/mdn/webaudio-examples/main/step-sequencer/dtmf.mp3",
+      "https://raw.githubusercontent.com/GoogleChromeLabs/web-audio-samples/main/src/demos/mld-drum-sampler/samples/drum-fx-01.mp3",
+      "https://raw.githubusercontent.com/GoogleChromeLabs/web-audio-samples/main/src/demos/mld-drum-sampler/samples/drum-oh-02.mp3",
+      makeAbsoluteUrl("example.mp3"),
+    ];
+    this.archiveProviders = [
+      {
+        label: "Radio Aporee Maps",
+        query: "collection:radio-aporee-maps AND format:MP3",
+        manualFallback: [
+          "https://archive.org/download/aporee_69834_81312/202507302277310N12113125E.mp3",
+          "https://archive.org/download/aporee_69841_81320/2509280023.mp3",
+          "https://archive.org/download/aporee_11664_13718/SBGNouMurcielagos.mp3",
+        ],
+        count: 100,
+        cursor: null,
+        itemsBuffer: [],
+        cooldownUntil: 0,
+        totalItems: null,
+        mp3Cache: new Map(),
+      },
+      {
+        label: "Kentuckiana Sounds",
+        query: "collection:kentuckianasounds AND format:MP3",
+        manualFallback: [],
+        count: 100,
+        cursor: null,
+        itemsBuffer: [],
+        cooldownUntil: 0,
+        totalItems: null,
+        mp3Cache: new Map(),
+      },
+      {
+        label: "Global Field Recordings",
+        query: 'collection:opensource_audio AND subject:"field recording" AND format:MP3',
+        manualFallback: [],
+        count: 100,
+        cursor: null,
+        itemsBuffer: [],
+        cooldownUntil: 0,
+        totalItems: null,
+        mp3Cache: new Map(),
+      },
+      {
+        label: "Birdsong & Wildlife",
+        query: 'collection:opensource_audio AND subject:"bird" AND format:MP3',
+        manualFallback: [],
+        count: 100,
+        cursor: null,
+        itemsBuffer: [],
+        cooldownUntil: 0,
+        totalItems: null,
+        mp3Cache: new Map(),
+      },
+      {
+        label: "Rain Soundscapes",
+        query: 'collection:opensource_audio AND subject:"rain" AND format:MP3',
+        manualFallback: [],
+        count: 100,
+        cursor: null,
+        itemsBuffer: [],
+        cooldownUntil: 0,
+        totalItems: null,
+        mp3Cache: new Map(),
+      },
+    ];
+    this.remoteAudioSources = Array.from(
+      new Set([
+        ...builtInFallbackSources,
+        ...this.archiveProviders.flatMap((provider) => provider.manualFallback || []),
+      ]),
+    );
     this.archiveSearchBaseUrl = "https://archive.org/advancedsearch.php";
+    this.archiveSearchScrapeUrl = "https://archive.org/services/search/v1/scrape";
     this.archiveMetadataBaseUrl = "https://archive.org/metadata/";
     this.archiveDownloadBaseUrl = "https://archive.org/download/";
-    this.archiveTotalItems = null;
-    this.archiveMp3Cache = new Map();
     this.addEventListeners();
   }
 
@@ -621,12 +709,61 @@ export default class SynthWaveform extends HTMLElement {
       return null;
     }
 
-    const archiveUrl = await this.getRandomArchiveMp3Url();
-    if (archiveUrl) {
+    const providerLookups = [];
+
+    if (Array.isArray(this.archiveProviders) && this.archiveProviders.length) {
+      for (const provider of this.archiveProviders) {
+        if (!provider || this.shouldSkipArchiveProvider(provider)) {
+          continue;
+        }
+        const label = provider.label || provider.query || "Archive";
+        providerLookups.push({
+          label,
+          providerRef: provider,
+          getUrl: () => this.getRandomArchiveMp3Url(provider),
+        });
+      }
+    }
+
+    if (Array.isArray(this.gitHubAudioProviders) && this.gitHubAudioProviders.length) {
+      for (const config of this.gitHubAudioProviders) {
+        if (!config) {
+          continue;
+        }
+        const label = config.cacheKey || `${config.owner}/${config.repo}`;
+        providerLookups.push({
+          label,
+          providerRef: config,
+          getUrl: () => this.getRandomGitHubAudioUrl(config),
+        });
+      }
+    }
+
+    const remainingProviders = [...providerLookups];
+    while (remainingProviders.length) {
+      const index = Math.floor(Math.random() * remainingProviders.length);
+      const providerInfo = remainingProviders.splice(index, 1)[0];
+      if (!providerInfo || typeof providerInfo.getUrl !== "function") {
+        continue;
+      }
+      const { label, getUrl, providerRef } = providerInfo;
+      let url;
       try {
-        return await this.fetchAudioBufferFromUrl(archiveUrl);
+        url = await getUrl();
       } catch (error) {
-        console.warn("Archive audio fetch failed, trying fallback list.", error);
+        console.warn(`Remote audio provider lookup failed (${label}):`, error);
+        continue;
+      }
+      if (!url) {
+        continue;
+      }
+      try {
+        return await this.fetchAudioBufferFromUrl(url);
+      } catch (error) {
+        console.warn(`Remote audio fetch failed for ${url} (${label}):`, error);
+        if (providerRef && this.archiveProviders?.includes(providerRef)) {
+          providerRef.cooldownUntil = Date.now() + 120_000;
+        }
       }
     }
 
@@ -659,62 +796,88 @@ export default class SynthWaveform extends HTMLElement {
     return this.decodeArrayBuffer(arrayBuffer);
   }
 
-  async getRandomArchiveMp3Url() {
+  shouldSkipArchiveProvider(provider) {
+    if (!provider) {
+      return true;
+    }
+    const cooldownUntil = Number(provider.cooldownUntil || 0);
+    if (cooldownUntil && cooldownUntil > Date.now()) {
+      return true;
+    }
+    return false;
+  }
+
+  async getRandomArchiveMp3Url(provider) {
+    if (!provider || !provider.query) {
+      return null;
+    }
+    const label = provider.label || provider.query || "Archive";
     try {
-      const total = await this.getArchiveItemCount();
-      if (!total) {
-        return null;
-      }
-      const randomIndex = Math.floor(Math.random() * total);
-      const params = new URLSearchParams({
-        q: `collection:${this.archiveCollectionId} AND format:MP3`,
-        output: "json",
-        rows: "1",
-        start: String(randomIndex),
-      });
-      const searchUrl = `${this.archiveSearchBaseUrl}?${params.toString()}`;
-      const searchData = await this.fetchArchiveJson(searchUrl);
-      const docs = searchData?.response?.docs;
-      if (!Array.isArray(docs) || !docs.length) {
-        return null;
-      }
-      const identifier = docs[0]?.identifier;
+      const identifier = await this.getArchiveIdentifier(provider);
       if (!identifier) {
         return null;
       }
-      const mp3FileName = await this.getArchiveMp3FileName(identifier);
+      const mp3FileName = await this.getArchiveMp3FileName(identifier, provider);
       if (!mp3FileName) {
         return null;
       }
       return `${this.archiveDownloadBaseUrl}${encodeURIComponent(identifier)}/${encodeURIComponent(mp3FileName)}`;
     } catch (error) {
-      console.warn("Archive random audio lookup failed:", error);
+      provider.cooldownUntil = Date.now() + 60_000;
+      console.warn(`Archive random audio lookup failed (${label}):`, error);
       return null;
     }
   }
 
-  async getArchiveItemCount() {
-    if (typeof this.archiveTotalItems === "number") {
-      return this.archiveTotalItems;
+  async getArchiveIdentifier(provider) {
+    if (!provider) {
+      return null;
     }
-    try {
-      const params = new URLSearchParams({
-        q: `collection:${this.archiveCollectionId} AND format:MP3`,
-        output: "json",
-        rows: "0",
-        start: "0",
-      });
-      const countUrl = `${this.archiveSearchBaseUrl}?${params.toString()}`;
-      const data = await this.fetchArchiveJson(countUrl);
-      const total = data?.response?.numFound;
-      if (typeof total === "number" && total > 0) {
-        this.archiveTotalItems = total;
-        return total;
+    if (!Array.isArray(provider.itemsBuffer) || !provider.itemsBuffer.length) {
+      try {
+        await this.populateArchiveItems(provider);
+      } catch (error) {
+        provider.cooldownUntil = Date.now() + 60_000;
+        throw error;
       }
-    } catch (error) {
-      console.warn("Archive item count lookup failed:", error);
     }
-    return null;
+    if (!Array.isArray(provider.itemsBuffer) || !provider.itemsBuffer.length) {
+      return null;
+    }
+    const index = Math.floor(Math.random() * provider.itemsBuffer.length);
+    const item = provider.itemsBuffer.splice(index, 1)[0];
+    const identifier = item?.identifier;
+    return typeof identifier === "string" && identifier.trim() ? identifier : null;
+  }
+
+  async populateArchiveItems(provider) {
+    if (!provider || !provider.query) {
+      return;
+    }
+
+    const count = Math.max(100, Number(provider.count) || 100);
+    const params = new URLSearchParams({
+      fields: "identifier",
+      count: String(count),
+      q: provider.query,
+    });
+    if (provider.cursor) {
+      params.set("cursor", provider.cursor);
+    }
+
+    const url = `${this.archiveSearchScrapeUrl}?${params.toString()}`;
+    const data = await this.fetchArchiveJson(url);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    provider.itemsBuffer = items.filter((item) => typeof item?.identifier === "string" && item.identifier.trim());
+    provider.cursor = data?.cursor || null;
+    provider.totalItems = typeof data?.total === "number" ? data.total : provider.totalItems;
+    provider.cooldownUntil = 0;
+    provider.hasLooped = !provider.cursor;
+    if (!provider.itemsBuffer.length && provider.hasLooped) {
+      // Reset to start if we exhausted the feed.
+      delete provider.hasLooped;
+      provider.cursor = null;
+    }
   }
 
   async fetchArchiveJson(url) {
@@ -725,22 +888,125 @@ export default class SynthWaveform extends HTMLElement {
     return response.json();
   }
 
-  async getArchiveMp3FileName(identifier) {
-    if (this.archiveMp3Cache.has(identifier)) {
-      return this.archiveMp3Cache.get(identifier);
-    }
-    const metadataUrl = `${this.archiveMetadataBaseUrl}${encodeURIComponent(identifier)}`;
-    const metadata = await this.fetchArchiveJson(metadataUrl);
-    const files = metadata?.files;
-    if (!Array.isArray(files) || !files.length) {
+  async getRandomGitHubAudioUrl(config) {
+    if (!config) {
       return null;
     }
-    const mp3Entry = files.find((file) => typeof file?.name === "string" && file.name.toLowerCase().endsWith(".mp3"));
-    const fileName = mp3Entry?.name || null;
-    if (fileName) {
-      this.archiveMp3Cache.set(identifier, fileName);
+    try {
+      const manifest = await this.getGitHubAudioManifest(config);
+      if (!Array.isArray(manifest) || !manifest.length) {
+        return null;
+      }
+      const index = Math.floor(Math.random() * manifest.length);
+      return manifest[index] || null;
+    } catch (error) {
+      console.warn("GitHub audio manifest lookup failed:", error);
+      return null;
     }
-    return fileName;
+  }
+
+  async getGitHubAudioManifest(config) {
+    const {
+      cacheKey,
+      owner,
+      repo,
+      branch = "main",
+      filterRegex = /\.(mp3|wav|ogg)$/i,
+      pathRegex,
+    } = config || {};
+    if (!owner || !repo) {
+      return null;
+    }
+
+    if (cacheKey && this.gitHubAudioCache.has(cacheKey)) {
+      return this.gitHubAudioCache.get(cacheKey);
+    }
+
+    if (cacheKey && this.gitHubAudioPromises.has(cacheKey)) {
+      return this.gitHubAudioPromises.get(cacheKey);
+    }
+
+    const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+
+    const manifestPromise = (async () => {
+      try {
+        const response = await fetch(url, { mode: "cors" });
+        if (!response.ok) {
+          throw new Error(`GitHub tree request failed: ${response.status}`);
+        }
+        const data = await response.json();
+        const tree = Array.isArray(data?.tree) ? data.tree : [];
+        const files = tree.filter((item) => {
+          if (!item || item.type !== "blob" || typeof item.path !== "string") {
+            return false;
+          }
+          if (filterRegex && !filterRegex.test(item.path)) {
+            return false;
+          }
+          if (pathRegex && !pathRegex.test(item.path)) {
+            return false;
+          }
+          return true;
+        });
+        const urls = files.map((item) => {
+          const encodedPath = item.path
+            .split("/")
+            .map((segment) => encodeURIComponent(segment))
+            .join("/");
+          return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodedPath}`;
+        });
+        if (cacheKey) {
+          this.gitHubAudioCache.set(cacheKey, urls);
+        }
+        return urls;
+      } finally {
+        if (cacheKey) {
+          this.gitHubAudioPromises.delete(cacheKey);
+        }
+      }
+    })();
+
+    if (cacheKey) {
+      this.gitHubAudioPromises.set(cacheKey, manifestPromise);
+    }
+
+    return manifestPromise;
+  }
+
+  async getArchiveMp3FileName(identifier, provider) {
+    if (!identifier) {
+      return null;
+    }
+    const cache = provider?.mp3Cache;
+    if (cache?.has(identifier)) {
+      return cache.get(identifier);
+    }
+    const label = provider?.label || provider?.query || "Archive";
+    try {
+      const metadataUrl = `${this.archiveMetadataBaseUrl}${encodeURIComponent(identifier)}`;
+      const metadata = await this.fetchArchiveJson(metadataUrl);
+      const files = metadata?.files;
+      if (!Array.isArray(files) || !files.length) {
+        return null;
+      }
+      const mp3Entry = files.find((file) => {
+        if (!file || typeof file.name !== "string") {
+          return false;
+        }
+        if (String(file.private) === "true") {
+          return false;
+        }
+        return file.name.toLowerCase().endsWith(".mp3");
+      });
+      const fileName = mp3Entry?.name || null;
+      if (fileName && cache) {
+        cache.set(identifier, fileName);
+      }
+      return fileName;
+    } catch (error) {
+      console.warn(`Archive metadata lookup failed (${label}, ${identifier}):`, error);
+      return null;
+    }
   }
 
   generateProceduralAudio() {
