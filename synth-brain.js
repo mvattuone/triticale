@@ -98,10 +98,12 @@ export default class SynthBrain extends HTMLElement {
     this.pendingImageRender = null;
     this.currentImageRender = null;
     this.lastRequestedImageSegment = null;
+    this.pendingDetuneImageRefresh = false;
     this.lastFaviconUpdate = 0;
     this.faviconUpdateInterval = 250;
     this.imageRenderCacheVersion = 0;
     this.imageRenderCache = new Map();
+    this.setAttribute('data-playing', 'false');
   }
 
   connectedCallback() {
@@ -270,21 +272,49 @@ export default class SynthBrain extends HTMLElement {
     return biquadFilter;
   }
 
-  detune({ config, source, }) {
-    if (config.detune.randomize) {
-      var waveArray = new Float32Array(config.detune.randomValues);
-      for (let i=0;i<config.detune.randomValues;i++) {
-        waveArray[i] = random(0.0001, 400); 
-      }
+  detune({ config, source, duration }) {
+    const detuneConfig = (config && config.detune) || this.config?.effects?.detune;
+    if (!detuneConfig || !source?.detune) {
+      return null;
+    }
 
-      source.detune.setValueCurveAtTime(waveArray, 0, source.buffer.duration);
-    } else if (config.detune.enablePartial) {
-      source.detune.setTargetAtTime(config.detune.value, config.detune.areaOfEffect, config.detune.areaOfEffect);
+    const context = source.context || this.audioCtx;
+    const now = context?.currentTime ?? 0;
+    if (typeof source.detune.cancelScheduledValues === 'function') {
+      source.detune.cancelScheduledValues(now);
+    }
+
+    if (detuneConfig.randomize) {
+      const points = Math.max(1, Math.round(detuneConfig.randomValues || 1));
+      const waveArray = new Float32Array(points);
+      for (let i = 0; i < points; i += 1) {
+        waveArray[i] = random(0.0001, 400);
+      }
+      const curveDuration = Math.max(
+        0.001,
+        duration ?? source.buffer?.duration ?? 0.5,
+      );
+      source.detune.setValueCurveAtTime(waveArray, now, curveDuration);
+    } else if (detuneConfig.enablePartial) {
+      const timeConstant = Math.max(0.001, detuneConfig.areaOfEffect || 0.5);
+      source.detune.setTargetAtTime(detuneConfig.value, now, timeConstant);
     } else {
-      source.detune.value = config.detune.value;
-    };
+      source.detune.setValueAtTime(detuneConfig.value, now);
+    }
       
     return null;
+  }
+
+  applyDetuneToActiveSources() {
+    if (!this.activeSources || this.activeSources.size === 0) {
+      return;
+    }
+    this.activeSources.forEach(({ source }) => {
+      if (!source) {
+        return;
+      }
+      this.detune({ config: this.config.effects, source, duration: source.buffer?.duration });
+    });
   }
 
   updateConfig(name, value) { 
@@ -374,8 +404,32 @@ export default class SynthBrain extends HTMLElement {
       if (typeof this.databender?.updateConfig === 'function') {
         this.databender.updateConfig(effectKey, valueKey, nextValue);
       }
-      this.invalidateProcessedAudio();
-      this.invalidateImageRenderState();
+      const lastSegment = this.lastRequestedImageSegment
+        ? { ...this.lastRequestedImageSegment }
+        : null;
+      let shouldInvalidateImage = true;
+      if (effectKey === 'detune') {
+        this.applyDetuneToActiveSources();
+        const isActive = this.isPlaying || this.ribbonEngaged || this.isLatched;
+        if (!isActive) {
+          shouldInvalidateImage = false;
+          this.pendingDetuneImageRefresh = true;
+        }
+      } else {
+        this.invalidateProcessedAudio();
+      }
+      if (shouldInvalidateImage) {
+        this.invalidateImageRenderState();
+        const segmentToRender = this.lastRequestedImageSegment
+          ? { ...this.lastRequestedImageSegment }
+          : lastSegment;
+        if (segmentToRender) {
+          this.renderImageSegment(segmentToRender.segmentIndex, segmentToRender.segmentCount);
+        } else if (this.imageGrains.length > 0) {
+          this.renderStandaloneImage();
+        }
+        this.pendingDetuneImageRefresh = false;
+      }
     }
 
     if (name === 'grainIndex' && this.isPlaying) {
@@ -551,6 +605,9 @@ export default class SynthBrain extends HTMLElement {
     if (!cacheKey) {
       return null;
     }
+    if (!this.isDetuneNeutral()) {
+      return null;
+    }
     const entry = this.imageRenderCache.get(cacheKey);
     if (!entry || entry.version !== this.imageRenderCacheVersion) {
       return null;
@@ -562,10 +619,28 @@ export default class SynthBrain extends HTMLElement {
     if (!cacheKey || !buffer) {
       return;
     }
+    if (!this.isDetuneNeutral()) {
+      return;
+    }
     this.imageRenderCache.set(cacheKey, {
       version: this.imageRenderCacheVersion,
       buffer,
     });
+  }
+
+  isDetuneNeutral() {
+    const detune = this.config?.effects?.detune;
+    if (!detune) {
+      return true;
+    }
+    if (detune.randomize) {
+      return false;
+    }
+    const value = Number(detune.value) || 0;
+    if (detune.enablePartial) {
+      return value === 0;
+    }
+    return value === 0;
   }
 
   createGrains(sample, sampleType = 'audio') {
@@ -806,7 +881,8 @@ export default class SynthBrain extends HTMLElement {
 
     const grainsCount = Math.max(1, this.imageNumberOfGrains || this.imageGrains.length);
     const cacheKey = `${clampedIndex}`;
-    const cachedBuffer = this.getCachedImageRender(cacheKey);
+    const canUseCache = this.isDetuneNeutral();
+    const cachedBuffer = canUseCache ? this.getCachedImageRender(cacheKey) : null;
 
     this.imageRenderInFlight = true;
 
@@ -841,7 +917,9 @@ export default class SynthBrain extends HTMLElement {
           return;
         }
         this.applyBitcrusherVisuals(buffer);
-        this.setCachedImageRender(cacheKey, buffer);
+        if (canUseCache) {
+          this.setCachedImageRender(cacheKey, buffer);
+        }
         const latest = this.lastRequestedImageSegment;
         const isLatestRequest = latest
           && latest.segmentIndex === segmentIndex
@@ -985,6 +1063,7 @@ export default class SynthBrain extends HTMLElement {
       this.bufferSource = this.audioCtx.createBufferSource();
       this.bufferSource.buffer = playbackBuffer;
       this.bufferSource.loop = false;
+      this.detune({ config: this.config.effects, source: this.bufferSource, duration: clampedDuration });
 
       const gainNode = this.audioCtx.createGain();
       gainNode.gain.cancelScheduledValues(now);
@@ -1076,7 +1155,23 @@ export default class SynthBrain extends HTMLElement {
 
     if (!hasImageGrains && !hasAudioGrains) {
       this.isPlaying = false;
+      this.notifyPlaybackState(false);
       return;
+    }
+
+    this.notifyPlaybackState(true);
+
+    if (this.pendingDetuneImageRefresh) {
+      this.pendingDetuneImageRefresh = false;
+      this.invalidateImageRenderState();
+      const segmentToRender = this.lastRequestedImageSegment
+        ? { ...this.lastRequestedImageSegment }
+        : null;
+      if (segmentToRender) {
+        this.renderImageSegment(segmentToRender.segmentIndex, segmentToRender.segmentCount);
+      } else if (this.imageGrains.length > 0) {
+        this.renderStandaloneImage();
+      }
     }
 
     if (hasAudioGrains) {
@@ -1115,6 +1210,7 @@ export default class SynthBrain extends HTMLElement {
     this.clearPlayTimers();
     this.isPlaying = false;
     this.ribbonEngaged = false;
+    this.notifyPlaybackState(false);
 
     if (this.image) {
       const updateImageEvent = new CustomEvent("update-image", {
@@ -1137,6 +1233,16 @@ export default class SynthBrain extends HTMLElement {
       }
     });
     this.playTimers = [];
+  }
+
+  notifyPlaybackState(isPlaying) {
+    this.setAttribute('data-playing', isPlaying ? 'true' : 'false');
+    const event = new CustomEvent('playback-state-changed', {
+      detail: { playing: Boolean(isPlaying) },
+      bubbles: true,
+      composed: true,
+    });
+    this.dispatchEvent(event);
   }
 }
 
