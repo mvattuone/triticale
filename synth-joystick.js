@@ -261,6 +261,8 @@ export default class SynthJoystick extends HTMLElement {
     this.randomAnimationFrame = null;
     this.randomPhase = null;
     this.metrics = null;
+    this.isSynthPlaying = false;
+    this.pendingRandomStart = false;
   }
 
   connectedCallback() {
@@ -308,6 +310,10 @@ export default class SynthJoystick extends HTMLElement {
 
     this.boundRandomClick = this.handleRandomClick.bind(this);
     this.randomButton.addEventListener('click', this.boundRandomClick);
+
+    this.isSynthPlaying = this.readSynthPlayingState();
+    this.boundPlaybackChanged = this.handlePlaybackChanged.bind(this);
+    this.synthBrain?.addEventListener('playback-state-changed', this.boundPlaybackChanged);
   }
 
   disconnectedCallback() {
@@ -325,6 +331,7 @@ export default class SynthJoystick extends HTMLElement {
 
     this.randomButton.removeEventListener('click', this.boundRandomClick);
     this.stopRandomMotion();
+    this.synthBrain?.removeEventListener('playback-state-changed', this.boundPlaybackChanged);
   }
 
   attributeChangedCallback(name, _oldValue, newValue) {
@@ -356,6 +363,10 @@ export default class SynthJoystick extends HTMLElement {
       return undefined;
     }
     return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), this.synthBrain.config);
+  }
+
+  readSynthPlayingState() {
+    return this.synthBrain?.getAttribute('data-playing') === 'true';
   }
 
   emitConfigUpdate(name, value) {
@@ -470,13 +481,6 @@ export default class SynthJoystick extends HTMLElement {
     this.baseElement.setAttribute('aria-valuenow', `${Math.round(this.visualValue)}`);
   }
 
-  setVisualValue(value) {
-    const clamped = clamp(value, -this.maxAbs, this.maxAbs);
-    this.visualValue = clamped;
-    this.render();
-    this.baseElement.setAttribute('aria-valuenow', `${Math.round(this.visualValue)}`);
-  }
-
   render() {
     const metrics = this.ensureMetrics();
     const travel = metrics ? metrics.travelY : 0;
@@ -494,6 +498,21 @@ export default class SynthJoystick extends HTMLElement {
     this.updateRandomize(!this.randomizeActive, { emit: true });
   }
 
+  handlePlaybackChanged(event) {
+    const { playing } = event.detail || {};
+    this.isSynthPlaying = Boolean(playing ?? this.readSynthPlayingState());
+    if (this.isSynthPlaying) {
+      if (this.randomizeActive) {
+        this.startRandomMotion();
+      }
+    } else {
+      if (this.randomizeActive) {
+        this.stopRandomMotion();
+        this.pendingRandomStart = true;
+      }
+    }
+  }
+
   updateRandomize(state, { emit } = { emit: false }) {
     if (state === this.randomizeActive) {
       return;
@@ -502,11 +521,16 @@ export default class SynthJoystick extends HTMLElement {
     this.randomButton.dataset.active = state ? 'true' : 'false';
     this.randomButton.setAttribute('aria-pressed', state ? 'true' : 'false');
     if (state) {
-      this.startRandomMotion();
+      if (this.isSynthPlaying) {
+        this.startRandomMotion();
+      } else {
+        this.pendingRandomStart = true;
+      }
     } else {
       this.stopRandomMotion();
-      this.setVisualValue(this.currentValue);
+      this.setCurrentValue(0, { emit: true, forceVisual: true });
       this.lastEmittedValue = null;
+      this.pendingRandomStart = false;
     }
     if (emit) {
       this.emitConfigUpdate(this.randomName, state);
@@ -514,6 +538,11 @@ export default class SynthJoystick extends HTMLElement {
   }
 
   startRandomMotion() {
+    if (!this.isSynthPlaying) {
+      this.pendingRandomStart = true;
+      return;
+    }
+    this.pendingRandomStart = false;
     this.stopRandomMotion();
     const scheduleNextPhase = (startValue = this.visualValue) => {
       const duration = 450 + Math.random() * 600;
@@ -528,6 +557,11 @@ export default class SynthJoystick extends HTMLElement {
 
     const step = (timestamp) => {
       if (!this.randomizeActive) {
+        return;
+      }
+      if (!this.isSynthPlaying) {
+        this.stopRandomMotion();
+        this.pendingRandomStart = true;
         return;
       }
       if (!this.randomPhase) {
