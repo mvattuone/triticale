@@ -538,7 +538,7 @@ export default class SynthJoystick extends HTMLElement {
       const progress = duration > 0 ? clamp(elapsed / duration, 0, 1) : 1;
       const eased = easeInOutSine(progress);
       const nextValue = from + (to - from) * eased;
-      this.setVisualValue(nextValue);
+      this.setCurrentValue(nextValue, { emit: true, forceVisual: true });
       if (progress >= 1) {
         scheduleNextPhase(nextValue);
       }
