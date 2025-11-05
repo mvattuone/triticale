@@ -21,11 +21,11 @@ export default class SynthJoystick extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
 :host {
-  --joystick-width: 62px;              /* outer panel (square is fine) */
-  --track-width: 26px;                  /* vertical slot width */
-  --nub-width: 28px;                    /* little horizontal handle */
+  --joystick-width: 62px;             
+  --track-width: 26px;                 
+  --nub-width: 28px;                  
   --nub-height: 16px;
-  --accent: #ff7a2d;                    /* warm orange */
+  --accent: #ff7a2d;                 
   --accent-strong: #ff5a00;
   --panel: #0b0d11;
   --panel-hi: #1c1f25;
