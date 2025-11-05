@@ -5252,19 +5252,18 @@ function getImportMapMarkup() {
   const serializedMap = JSON.stringify(parsedImportMap, null, 2);
   return `<script type="importmap" data-triticale-importmap>${serializedMap}<\/script>`;
 }
-async function unmount(root) {
-  const el = document.querySelector(root);
-  if (!el) {
-    throw new Error("no root present to unmount!");
+async function unmount(rootEl) {
+  if (!(rootEl instanceof HTMLElement)) {
+    throw new Error("unmount() requires a root HTMLElement");
   }
   try {
-    el.dispatchEvent(
+    rootEl.dispatchEvent(
       new Event("stop-synth", { bubbles: true, composed: true })
     );
   } catch (error) {
     console.error("Failed to dispatch stop-synth", error);
   }
-  const ctx = el.audioCtx;
+  const ctx = rootEl.audioCtx;
   if (ctx && typeof ctx.close === "function" && ctx.state !== "closed") {
     try {
       await ctx.close();
@@ -5272,7 +5271,7 @@ async function unmount(root) {
       console.warn("Failed to close triticale audio context", error);
     }
   }
-  el.remove();
+  rootEl.remove();
 }
 async function mount({ container, root } = {}) {
   if (!container) {
