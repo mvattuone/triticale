@@ -101,6 +101,55 @@ class SynthDisplay extends HTMLElement {
                   filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
                 }
 
+                .fullscreen-button {
+                  position: absolute;
+                  inset: auto 1rem 1rem auto;
+                  width: 44px;
+                  height: 44px;
+                  border-radius: 999px;
+                  border: 1px solid #0e1116;
+                  background: linear-gradient(145deg, #efefef, #bcbcbc);
+                  box-shadow:
+                    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+                    0 2px 6px rgba(0, 0, 0, 0.35);
+                  display: none;
+                  align-items: center;
+                  justify-content: center;
+                  opacity: 0;
+                  pointer-events: none;
+                  transition: opacity 0.2s ease;
+                  z-index: 4;
+                  cursor: pointer;
+                }
+
+                .display.has-image .fullscreen-button {
+                  display: flex;
+                  opacity: 1;
+                  pointer-events: auto;
+                }
+
+
+                .fullscreen-button .icon-fullscreen {
+                  width: 22px;
+                  height: 22px;
+                  display: inline-block;
+                }
+
+                .fullscreen-button .icon-fullscreen svg {
+                  display: block;
+                  width: 100%;
+                  height: 100%;
+                  fill: none;
+                  stroke: #1a1d24;
+                  stroke-width: 1.6;
+                  stroke-linecap: round;
+                  stroke-linejoin: round;
+                }
+
+                .fullscreen-button .icon-fullscreen rect {
+                  stroke-dasharray: 5;
+                }
+
                 .control-buttons .remove {
                   font-weight: 600;
                   letter-spacing: 0.08em;
@@ -181,6 +230,13 @@ class SynthDisplay extends HTMLElement {
                       </button>
                       <button class="remove" type="button" aria-label="Remove image">X</button>
                     </div>
+                    <button class="fullscreen-button" type="button" aria-label="Enter full screen view">
+                      <span class="icon-fullscreen" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" role="presentation">
+                          <rect x="5" y="5" width="14" height="14" rx="1.5" ry="1.5" />
+                        </svg>
+                      </span>
+                    </button>
                     <canvas class="display-canvas"></canvas>
                     <canvas class="crt-overlay"></canvas>
                     <div class="overlay-curvature"></div>
@@ -202,6 +258,7 @@ class SynthDisplay extends HTMLElement {
     this.imageControlButtons = this.shadowRoot.querySelector(".control-buttons");
     this.resetImageButton = this.shadowRoot.querySelector(".control-buttons .refresh");
     this.removeImageButton = this.shadowRoot.querySelector(".control-buttons .remove");
+    this.fullscreenButton = this.shadowRoot.querySelector(".fullscreen-button");
     this.randomImageButtonLabel = this.randomImageButton?.textContent || "Random image";
     this.image = null;
     this.animationFrameId = null;
@@ -224,6 +281,11 @@ class SynthDisplay extends HTMLElement {
     if (this.removeImageButton) {
       this.removeImageButton.addEventListener("click", this.handleRemoveImageClick);
     }
+    if (this.fullscreenButton) {
+      this.fullscreenButton.addEventListener("click", this.handleFullscreenClick);
+      this.fullscreenButton.disabled = true;
+    }
+    document.addEventListener("fullscreenchange", this.handleFullscreenChange);
   }
 
   disconnectedCallback() {
@@ -238,6 +300,10 @@ class SynthDisplay extends HTMLElement {
     if (this.removeImageButton) {
       this.removeImageButton.removeEventListener("click", this.handleRemoveImageClick);
     }
+    if (this.fullscreenButton) {
+      this.fullscreenButton.removeEventListener("click", this.handleFullscreenClick);
+    }
+    document.removeEventListener("fullscreenchange", this.handleFullscreenChange);
     this.stopCRTLoop();
   }
 
@@ -357,6 +423,9 @@ class SynthDisplay extends HTMLElement {
     if (this.removeImageButton) {
       this.removeImageButton.disabled = disabled;
     }
+    if (this.fullscreenButton) {
+      this.fullscreenButton.disabled = disabled || !this.image;
+    }
   }
 
   handleResetImageClick = () => {
@@ -374,6 +443,9 @@ class SynthDisplay extends HTMLElement {
   };
 
   clearImage() {
+    if (this.isDisplayInFullscreen()) {
+      this.exitFullscreen();
+    }
     this.stopCRTLoop();
     if (this.context && this.canvas) {
       this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -393,6 +465,7 @@ class SynthDisplay extends HTMLElement {
     this.showRandomImageButton();
     this.setImageControlsDisabled(false);
     this.showDropMessage();
+    this.updateFullscreenAvailability();
   }
 
   showDropMessage() {
@@ -416,6 +489,60 @@ class SynthDisplay extends HTMLElement {
     this.syncOverlaySize();
     this.startCRTLoop();
     this.context.drawImage(image, 0, 0);
+    this.updateFullscreenAvailability();
+  }
+
+  updateFullscreenAvailability() {
+    if (this.fullscreenButton) {
+      const hasImage = Boolean(this.image);
+      this.fullscreenButton.disabled = !hasImage;
+    }
+  }
+
+  handleFullscreenClick = async () => {
+    if (!this.displayContainer) {
+      return;
+    }
+    if (this.isDisplayInFullscreen()) {
+      this.exitFullscreen();
+      return;
+    }
+    try {
+      await this.enterFullscreen(this.displayContainer);
+    } catch (error) {
+      console.error("Failed to enter fullscreen", error);
+    }
+  };
+
+  handleFullscreenChange = () => {
+    if (!this.fullscreenButton) {
+      return;
+    }
+    const isActive = this.isDisplayInFullscreen();
+    this.fullscreenButton.classList.toggle("active", isActive);
+    this.fullscreenButton.setAttribute(
+      "aria-label",
+      isActive ? "Exit full screen view" : "Enter full screen view"
+    );
+  };
+
+  isDisplayInFullscreen() {
+    const fullscreenElement = document.fullscreenElement;
+    if (!fullscreenElement) {
+      return false;
+    }
+    return fullscreenElement === this.displayContainer || fullscreenElement === this;
+  }
+
+  enterFullscreen(element) {
+    if (!element) {
+      return Promise.resolve();
+    }
+    return element.requestFullscreen();
+  }
+
+  exitFullscreen() {
+    document.exitFullscreen();
   }
 
   startCRTLoop() {
