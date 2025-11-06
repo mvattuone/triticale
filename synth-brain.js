@@ -120,7 +120,7 @@ export default class SynthBrain extends HTMLElement {
     this.removeEventListener("image-cleared", this.handleImageCleared);
     this.removeEventListener("update-sample", this.updateAudioSelection);
     this.removeEventListener("latch-changed", this.handleLatchChanged);
-    this.removeEventListener("update-config", this.handleupdateConfig);
+    this.removeEventListener("update-config", this.handleUpdateConfig);
     this.removeEventListener("audio-cleared", this.handleAudioCleared);
   }
 
