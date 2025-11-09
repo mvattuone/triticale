@@ -494,6 +494,17 @@ export default class SynthBrain extends HTMLElement {
     return { ...effectConfig };
   }
 
+  applyAudioSelectionBuffer(buffer) {
+    if (!buffer || typeof buffer.getChannelData !== "function") {
+      return;
+    }
+
+    this.audioSelection = buffer;
+    this.audioGrains = this.createGrains(this.audioSelection, 'audio');
+    this.invalidateProcessedAudio();
+    this.notifyGrainCounts();
+  }
+
   handleAudioUploaded(event) {
     const { buffer } = event.detail;
     const updateAudioEvent = new CustomEvent("update-audio", {
@@ -503,10 +514,7 @@ export default class SynthBrain extends HTMLElement {
     });
     this.querySelector("synth-waveform").dispatchEvent(updateAudioEvent);
 
-    this.audioSelection = buffer;
-    this.audioGrains = this.createGrains(this.audioSelection, 'audio');
-    this.invalidateProcessedAudio();
-    this.notifyGrainCounts();
+    this.applyAudioSelectionBuffer(buffer);
   }
 
   handleAudioCleared() {
@@ -564,14 +572,22 @@ export default class SynthBrain extends HTMLElement {
     return this.processedAudioSelectionPromise;
   }
 
+  applyImageBuffer(buffer) {
+    if (!buffer) {
+      return;
+    }
+
+    this.imageBuffer = buffer;
+    this.invalidateImageRenderState();
+    this.imageGrains = this.createGrains(this.imageBuffer, 'image');
+    this.notifyGrainCounts();
+  }
+
   handleImageUploaded(event) {
     const { image } = event.detail;
 
     this.databender.convert(image).then((buffer) => {
-      this.imageBuffer = buffer;
-      this.invalidateImageRenderState();
-      this.imageGrains = this.createGrains(this.imageBuffer, 'image');
-      this.notifyGrainCounts();
+      this.applyImageBuffer(buffer);
     });
   }
 

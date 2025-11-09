@@ -541,6 +541,15 @@ var SynthBrain = class extends HTMLElement {
     }
     return { ...effectConfig };
   }
+  applyAudioSelectionBuffer(buffer) {
+    if (!buffer || typeof buffer.getChannelData !== "function") {
+      return;
+    }
+    this.audioSelection = buffer;
+    this.audioGrains = this.createGrains(this.audioSelection, "audio");
+    this.invalidateProcessedAudio();
+    this.notifyGrainCounts();
+  }
   handleAudioUploaded(event) {
     const { buffer } = event.detail;
     const updateAudioEvent = new CustomEvent("update-audio", {
@@ -549,10 +558,7 @@ var SynthBrain = class extends HTMLElement {
       composed: true
     });
     this.querySelector("synth-waveform").dispatchEvent(updateAudioEvent);
-    this.audioSelection = buffer;
-    this.audioGrains = this.createGrains(this.audioSelection, "audio");
-    this.invalidateProcessedAudio();
-    this.notifyGrainCounts();
+    this.applyAudioSelectionBuffer(buffer);
   }
   handleAudioCleared() {
     this.stopSynth();
@@ -597,13 +603,19 @@ var SynthBrain = class extends HTMLElement {
     }
     return this.processedAudioSelectionPromise;
   }
+  applyImageBuffer(buffer) {
+    if (!buffer) {
+      return;
+    }
+    this.imageBuffer = buffer;
+    this.invalidateImageRenderState();
+    this.imageGrains = this.createGrains(this.imageBuffer, "image");
+    this.notifyGrainCounts();
+  }
   handleImageUploaded(event) {
     const { image } = event.detail;
     this.databender.convert(image).then((buffer) => {
-      this.imageBuffer = buffer;
-      this.invalidateImageRenderState();
-      this.imageGrains = this.createGrains(this.imageBuffer, "image");
-      this.notifyGrainCounts();
+      this.applyImageBuffer(buffer);
     });
   }
   handleImageCleared() {
@@ -5205,6 +5217,7 @@ var cachedImportMap = void 0;
 var EMPTY_IMPORT_MAP = Object.freeze({ imports: {} });
 var ABSOLUTE_URL_PATTERN = /^(?:[a-z]+:|\/\/|data:|blob:|#)/i;
 var IMPORTMAP_PATTERN = /<script\s+type=["']importmap["'][^>]*>([\s\S]*?)<\/script>/i;
+var HOST_CACHE_KEY = "triticale:state";
 var publicPath = new URL("./", import.meta.url).href;
 setPublicPath(publicPath);
 function ensureApp() {
@@ -5252,10 +5265,11 @@ function getImportMapMarkup() {
   const serializedMap = JSON.stringify(parsedImportMap, null, 2);
   return `<script type="importmap" data-triticale-importmap>${serializedMap}<\/script>`;
 }
-async function unmount(rootEl) {
+async function unmount(rootEl, hostContext = null) {
   if (!(rootEl instanceof HTMLElement)) {
     throw new Error("unmount() requires a root HTMLElement");
   }
+  persistSynthState(rootEl, hostContext);
   try {
     rootEl.dispatchEvent(
       new Event("stop-synth", { bubbles: true, composed: true })
@@ -5273,7 +5287,7 @@ async function unmount(rootEl) {
   }
   rootEl.remove();
 }
-async function mount({ container, root } = {}) {
+async function mount({ container, root, host } = {}) {
   if (!container) {
     throw new Error("mount() requires an { element } to attach to");
   }
@@ -5289,6 +5303,7 @@ async function mount({ container, root } = {}) {
   rewriteAssetReferences(fragment);
   container.style.backgroundColor = getComputedStyle(rootEl).backgroundColor;
   container.replaceChildren(fragment);
+  restoreSynthState(rootEl, host);
   return {
     container,
     rootEl
@@ -5317,6 +5332,178 @@ function rewriteAssetReferences(root) {
       }
     });
   });
+}
+function persistSynthState(rootEl, hostContext) {
+  const cache = resolveHostCache(hostContext);
+  if (!cache) {
+    return;
+  }
+  const snapshot = createSynthSnapshot(rootEl);
+  if (!snapshot) {
+    cache.delete(HOST_CACHE_KEY);
+    return;
+  }
+  cache.write(HOST_CACHE_KEY, snapshot);
+}
+function restoreSynthState(rootEl, hostContext) {
+  const cache = resolveHostCache(hostContext);
+  if (!cache) {
+    return;
+  }
+  const snapshot = cache.read(HOST_CACHE_KEY);
+  if (!snapshot) {
+    return;
+  }
+  if (snapshot.config) {
+    applyConfigSnapshot(rootEl, snapshot.config);
+  }
+  if (snapshot.audioSelection) {
+    rootEl.applyAudioSelectionBuffer(snapshot.audioSelection);
+  }
+  if (snapshot.imageBuffer) {
+    rootEl.applyImageBuffer(snapshot.imageBuffer);
+  }
+  const synthWaveform = rootEl.querySelector("synth-waveform");
+  if (synthWaveform && snapshot.waveform?.buffer && typeof synthWaveform.loadAudio === "function") {
+    synthWaveform.loadAudio(snapshot.waveform.buffer);
+  }
+  const synthDisplay = rootEl.querySelector("synth-display");
+  if (synthDisplay && snapshot.display) {
+    hydrateDisplay(synthDisplay, snapshot.display);
+  }
+}
+function createSynthSnapshot(rootEl) {
+  if (!(rootEl instanceof HTMLElement)) {
+    return null;
+  }
+  const synthWaveform = rootEl.querySelector("synth-waveform");
+  const synthDisplay = rootEl.querySelector("synth-display");
+  const snapshot = {};
+  if (rootEl.config) {
+    snapshot.config = cloneConfig(rootEl.config);
+  }
+  if (rootEl.audioSelection) {
+    snapshot.audioSelection = rootEl.audioSelection;
+  }
+  if (rootEl.imageBuffer) {
+    snapshot.imageBuffer = rootEl.imageBuffer;
+  }
+  if (synthWaveform?.buffer) {
+    snapshot.waveform = {
+      buffer: synthWaveform.buffer
+    };
+  }
+  const displaySnapshot = createDisplaySnapshot(synthDisplay);
+  if (displaySnapshot) {
+    snapshot.display = displaySnapshot;
+  }
+  if (Object.keys(snapshot).length === 0) {
+    return null;
+  }
+  return snapshot;
+}
+function createDisplaySnapshot(display) {
+  if (!display?.image) {
+    return null;
+  }
+  const snapshot = {
+    width: display.image?.width ?? null,
+    height: display.image?.height ?? null,
+    dataUrl: null,
+    src: null
+  };
+  const canvas = display.canvas;
+  if (canvas && typeof canvas.toDataURL === "function") {
+    try {
+      snapshot.dataUrl = canvas.toDataURL("image/png");
+    } catch (error) {
+      console.warn("Failed to serialize synth-display canvas", error);
+      snapshot.src = display.image?.src ?? null;
+    }
+  } else {
+    snapshot.src = display.image?.src ?? null;
+  }
+  if (!snapshot.dataUrl && !snapshot.src) {
+    return null;
+  }
+  return snapshot;
+}
+function hydrateDisplay(display, snapshot) {
+  const nextImage = new Image(snapshot.width || void 0, snapshot.height || void 0);
+  nextImage.decoding = "async";
+  nextImage.crossOrigin = "anonymous";
+  const applyImage = () => {
+    if (typeof display.drawImage === "function") {
+      display.drawImage(nextImage);
+    }
+  };
+  nextImage.onload = applyImage;
+  nextImage.onerror = () => {
+    if (snapshot.src && snapshot.src !== nextImage.src) {
+      nextImage.src = snapshot.src;
+      return;
+    }
+  };
+  if (snapshot.dataUrl) {
+    nextImage.src = snapshot.dataUrl;
+  } else if (snapshot.src) {
+    nextImage.src = snapshot.src;
+  }
+}
+function applyConfigSnapshot(rootEl, snapshot) {
+  if (!rootEl || typeof rootEl.updateConfig !== "function" || !snapshot) {
+    return;
+  }
+  const entries = [];
+  flattenConfig(snapshot, "", entries);
+  entries.forEach(({ path, value }) => {
+    try {
+      rootEl.updateConfig(path, value);
+    } catch (error) {
+      console.warn(`Failed to restore config value for ${path}`, error);
+    }
+  });
+}
+function flattenConfig(node, prefix, accumulator) {
+  if (node === null || typeof node !== "object") {
+    if (prefix) {
+      accumulator.push({ path: prefix, value: node });
+    }
+    return;
+  }
+  Object.entries(node).forEach(([key, value]) => {
+    const nextPrefix = prefix ? `${prefix}.${key}` : key;
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      flattenConfig(value, nextPrefix, accumulator);
+    } else if (prefix || typeof value !== "object") {
+      accumulator.push({ path: nextPrefix, value });
+    }
+  });
+}
+function cloneConfig(config) {
+  if (!config) {
+    return null;
+  }
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(config);
+    } catch {
+    }
+  }
+  try {
+    return JSON.parse(JSON.stringify(config));
+  } catch {
+    return null;
+  }
+}
+function resolveHostCache(hostContext) {
+  if (!hostContext) {
+    return null;
+  }
+  if (hostContext.cache) {
+    return hostContext.cache;
+  }
+  return hostContext;
 }
 export {
   mount,
