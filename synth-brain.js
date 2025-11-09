@@ -1,4 +1,4 @@
-import Databender from "https://cdn.jsdelivr.net/npm/databender@2.0.0-alpha.1/index.js";
+import Databender from "./vendor/databender.js";
 import Pizzicato from "https://cdn.jsdelivr.net/npm/pizzicato@0.6.4/+esm";
 import { chunk } from 'helpers/chunk.js';
 import { hannWindow } from 'helpers/hannWindow.js';
@@ -16,6 +16,17 @@ const loadBitcrusherModule = (() => {
       return;
     }
     await context.audioWorklet.addModule(makeAbsoluteUrl('effects/bitcrusher.js'));
+    loadedOn.add(context);
+  };
+})();
+
+const loadGranularModule = (() => {
+  const loadedOn = new WeakSet();
+  return async (context) => {
+    if (!context?.audioWorklet || loadedOn.has(context)) {
+      return;
+    }
+    await context.audioWorklet.addModule(makeAbsoluteUrl('effects/granular-processor.js'));
     loadedOn.add(context);
   };
 })();
@@ -84,7 +95,6 @@ export default class SynthBrain extends HTMLElement {
       <slot></slot>
     `;
     ensureBoxSizing(this.shadowRoot);
-    this.bufferSource;
     this.activeSources = new Set();
     this.isPlaying = false;
     this.playTimers = [];
@@ -104,6 +114,9 @@ export default class SynthBrain extends HTMLElement {
     this.imageRenderCacheVersion = 0;
     this.imageRenderCache = new Map();
     this.setAttribute('data-playing', 'false');
+    this.granularNode = null;
+    this.loadGranularModulePromise = null;
+    this.lastGranularBuffer = null;
   }
 
   connectedCallback() {
@@ -306,15 +319,91 @@ export default class SynthBrain extends HTMLElement {
   }
 
   applyDetuneToActiveSources() {
-    if (!this.activeSources || this.activeSources.size === 0) {
+    // Playback is now handled inside the granular AudioWorklet, so detune changes
+    // are applied automatically to future grains when scheduling.
+  }
+
+  async ensureGranularEngine() {
+    if (this.granularNode) {
+      return this.granularNode;
+    }
+    if (!this.loadGranularModulePromise) {
+      this.loadGranularModulePromise = loadGranularModule(this.audioCtx);
+    }
+    await this.loadGranularModulePromise;
+    this.granularNode = new AudioWorkletNode(this.audioCtx, 'granular-processor', {
+      numberOfOutputs: 1,
+      outputChannelCount: [this.audioCtx.destination.channelCount || 2],
+    });
+    this.granularNode.connect(this.audioCtx.destination);
+    return this.granularNode;
+  }
+
+  async syncGrainBufferToWorklet(buffer) {
+    if (!buffer) {
       return;
     }
-    this.activeSources.forEach(({ source }) => {
-      if (!source) {
-        return;
-      }
-      this.detune({ config: this.config.effects, source, duration: source.buffer?.duration });
+    const node = await this.ensureGranularEngine();
+    if (!node) {
+      return;
+    }
+    if (this.lastGranularBuffer === buffer) {
+      return;
+    }
+    const channels = [];
+    const transfers = [];
+    for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+      const source = buffer.getChannelData(channel);
+      const copy = new Float32Array(source.length);
+      copy.set(source);
+      channels.push(copy);
+      transfers.push(copy.buffer);
+    }
+    node.port.postMessage({
+      type: 'load-buffer',
+      payload: {
+        channels,
+        length: buffer.length,
+        sampleRate: buffer.sampleRate,
+      },
+    }, transfers);
+    this.lastGranularBuffer = buffer;
+  }
+
+  scheduleGrainOnWorklet(grain, playbackRate) {
+    if (!this.granularNode || !grain) {
+      return;
+    }
+    this.granularNode.port.postMessage({
+      type: 'schedule-grain',
+      payload: {
+        startSample: grain.startSample,
+        length: grain.length,
+        playbackRate,
+        windowModifier: this.config.window,
+      },
     });
+  }
+
+  getDetunePlaybackRate() {
+    const detuneConfig = this.config?.effects?.detune;
+    if (!detuneConfig?.active) {
+      return 1;
+    }
+    const baseValue = Number(detuneConfig.value) || 0;
+    let cents = baseValue;
+
+    if (detuneConfig.randomize) {
+      const spread = Math.max(0, Number(detuneConfig.randomValues) || 0);
+      const min = cents - spread;
+      const max = cents + spread;
+      cents = Math.random() * (max - min) + min;
+    } else if (detuneConfig.enablePartial) {
+      const amount = Math.max(0, Math.min(1, Number(detuneConfig.areaOfEffect) || 0.5));
+      cents = cents * amount;
+    }
+
+    return Math.pow(2, cents / 1200);
   }
 
   updateConfig(name, value) { 
@@ -502,6 +591,9 @@ export default class SynthBrain extends HTMLElement {
     this.audioSelection = buffer;
     this.audioGrains = this.createGrains(this.audioSelection, 'audio');
     this.invalidateProcessedAudio();
+    this.syncGrainBufferToWorklet(this.audioSelection).catch((error) => {
+      console.error('Failed to sync audio selection to granular engine', error);
+    });
     this.notifyGrainCounts();
   }
 
@@ -524,12 +616,17 @@ export default class SynthBrain extends HTMLElement {
     this.audioNumberOfGrains = 0;
     this.audioSamplesPerGrain = 0;
     this.invalidateProcessedAudio();
+    this.lastGranularBuffer = null;
+    if (this.granularNode) {
+      this.granularNode.port.postMessage({ type: 'clear-buffer' });
+    }
     this.notifyGrainCounts();
   }
 
   invalidateProcessedAudio() {
     this.processedAudioSelection = null;
     this.processedAudioSelectionPromise = null;
+    this.lastGranularBuffer = null;
   }
 
   areEffectsActive() {
@@ -557,6 +654,9 @@ export default class SynthBrain extends HTMLElement {
         .render(this.audioSelection)
         .then((buffer) => {
           this.processedAudioSelection = buffer;
+          this.syncGrainBufferToWorklet(buffer).catch((error) => {
+            console.error('Failed to sync processed buffer to granular engine', error);
+          });
           return buffer;
         })
         .catch((error) => {
@@ -764,6 +864,9 @@ export default class SynthBrain extends HTMLElement {
 
     this.audioGrains = this.createGrains(this.audioSelection, 'audio');
     this.invalidateProcessedAudio();
+    this.syncGrainBufferToWorklet(this.audioSelection).catch((error) => {
+      console.error('Failed to sync updated audio selection to granular engine', error);
+    });
     this.notifyGrainCounts();
   }
 
@@ -1067,60 +1170,9 @@ export default class SynthBrain extends HTMLElement {
         return;
       }
 
-      const now = this.audioCtx.currentTime;
-      const duration = Math.max(grain.duration, 1 / this.audioCtx.sampleRate);
-
-      const remainingDuration = playbackBuffer.duration - grain.offset;
-      const clampedDuration = Math.min(duration, Math.max(0, remainingDuration));
-      if (clampedDuration <= 0) {
-        return;
-      }
-
-      this.bufferSource = this.audioCtx.createBufferSource();
-      this.bufferSource.buffer = playbackBuffer;
-      this.bufferSource.loop = false;
-      this.detune({ config: this.config.effects, source: this.bufferSource, duration: clampedDuration });
-
-      const gainNode = this.audioCtx.createGain();
-      gainNode.gain.cancelScheduledValues(now);
-      gainNode.gain.setValueAtTime(0, now);
-
-      const windowCurve = this.createWindowCurve(grain.length);
-      if (windowCurve && windowCurve.length > 0) {
-        gainNode.gain.setValueCurveAtTime(windowCurve, now, clampedDuration);
-      } else {
-        gainNode.gain.setValueAtTime(1, now);
-      }
-
-      this.bufferSource.connect(gainNode);
-      gainNode.connect(this.audioCtx.destination);
-      const activePair = { source: this.bufferSource, gain: gainNode };
-      this.activeSources.add(activePair);
-
-      this.bufferSource.onended = () => {
-        const clearGrainEvent = new Event('clear-grain', {
-          bubbles: true,
-          composed: true,
-        });
-        document.querySelector('synth-waveform').dispatchEvent(clearGrainEvent);
-        try {
-          gainNode.disconnect();
-        } catch (disconnectError) {
-          console.error('Failed to disconnect grain gain node', disconnectError);
-        }
-        try {
-          activePair.source.onended = null;
-          activePair.source.buffer = null;
-        } catch (releaseError) {
-          console.error('Failed to release finished grain buffer', releaseError);
-        }
-        this.activeSources.delete(activePair);
-        if (this.bufferSource === activePair.source) {
-          this.bufferSource = null;
-        }
-      };
-
-      this.bufferSource.start(now, grain.offset, clampedDuration);
+      await this.syncGrainBufferToWorklet(playbackBuffer);
+      const playbackRate = this.getDetunePlaybackRate();
+      this.scheduleGrainOnWorklet(grain, playbackRate);
 
       const drawGrainEvent = new CustomEvent('draw-grain', {
         detail: {
@@ -1198,35 +1250,16 @@ export default class SynthBrain extends HTMLElement {
   }
 
   stopSynth() {
-    if (this.activeSources && this.activeSources.size) {
-      this.activeSources.forEach(({ source, gain }) => {
-        try {
-          source.stop();
-        } catch (stopError) {
-          console.error('Failed to stop grain source', stopError);
-        }
-        try {
-          gain.disconnect();
-        } catch (disconnectError) {
-          console.error('Failed to disconnect grain gain node', disconnectError);
-        }
-        try {
-          source.onended = null;
-          source.buffer = null;
-        } catch (releaseError) {
-          console.error('Failed to release grain source buffer', releaseError);
-        }
-      });
-      this.activeSources.clear();
-    }
-    if (this.bufferSource) {
-      this.bufferSource = null;
+    this.activeSources = new Set();
+    if (this.granularNode) {
+      this.granularNode.port.postMessage({ type: 'clear-grains' });
     }
 
     this.clearPlayTimers();
     this.isPlaying = false;
     this.ribbonEngaged = false;
     this.notifyPlaybackState(false);
+    this.grainYieldCounter = 0;
 
     if (this.image) {
       const updateImageEvent = new CustomEvent("update-image", {
