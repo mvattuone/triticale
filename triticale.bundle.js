@@ -78,7 +78,7 @@ var DndWrapper = class extends HTMLElement {
 customElements.define("dnd-wrapper", DndWrapper);
 
 // synth-brain.js
-import Databender from "https://cdn.jsdelivr.net/npm/databender@2.0.0-alpha.1/index.js";
+import Databender from "https://cdn.jsdelivr.net/npm/databender@2.0.0-alpha.2/index.js";
 import Pizzicato from "https://cdn.jsdelivr.net/npm/pizzicato@0.6.4/+esm";
 
 // helpers/chunk.js

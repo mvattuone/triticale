@@ -1,4 +1,4 @@
-import Databender from "./vendor/databender.js";
+import Databender from "https://cdn.jsdelivr.net/npm/databender@2.0.0-alpha.2/index.js";
 import Pizzicato from "https://cdn.jsdelivr.net/npm/pizzicato@0.6.4/+esm";
 import { chunk } from 'helpers/chunk.js';
 import { hannWindow } from 'helpers/hannWindow.js';
