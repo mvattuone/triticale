@@ -89,6 +89,11 @@ function* chunk(arr, chunkSize) {
   }
 }
 
+// helpers/random.js
+function random(x, y) {
+  return Math.floor(x + (y - x + 1) * crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32);
+}
+
 // helpers/hannWindow.js
 function hannWindow(length, modifier) {
   let window2 = new Float32Array(length);
@@ -125,9 +130,6 @@ function makeAbsoluteUrl(path) {
 }
 
 // synth-brain.js
-function random(x, y) {
-  return x + (y - x + 1) * crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 | 0;
-}
 var loadBitcrusherModule = /* @__PURE__ */ (() => {
   const loadedOn = /* @__PURE__ */ new WeakSet();
   return async (context) => {
