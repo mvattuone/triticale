@@ -4,29 +4,7 @@ import { chunk } from 'helpers/chunk.js';
 import { random } from 'helpers/random.js';
 import { hannWindow } from 'helpers/hannWindow.js';
 import { ensureBoxSizing } from 'helpers/boxSizing.js';
-import { makeAbsoluteUrl } from 'helpers/makeAbsoluteUrl.js';
-
-const loadBitcrusherModule = (() => {
-  const loadedOn = new WeakSet();
-  return async (context) => {
-    if (!context?.audioWorklet || loadedOn.has(context)) {
-      return;
-    }
-    await context.audioWorklet.addModule(makeAbsoluteUrl('effects/bitcrusher.js'));
-    loadedOn.add(context);
-  };
-})();
-
-const loadGranularModule = (() => {
-  const loadedOn = new WeakSet();
-  return async (context) => {
-    if (!context?.audioWorklet || loadedOn.has(context)) {
-      return;
-    }
-    await context.audioWorklet.addModule(makeAbsoluteUrl('effects/granular-processor.js'));
-    loadedOn.add(context);
-  };
-})();
+import { loadWorkletModule } from "./helpers/loadWorkletModule";
 
 export default class SynthBrain extends HTMLElement {
   constructor() {
@@ -161,7 +139,7 @@ export default class SynthBrain extends HTMLElement {
 
   bitcrusherFactory = async (payload) => {
     const { context, config } = payload;
-    await loadBitcrusherModule(context);
+    await loadWorkletModule(context, 'effects/bitcrusher.js');
     return this.bitcrusher({ context, config }); // your existing constructor
   };
 
@@ -325,7 +303,7 @@ export default class SynthBrain extends HTMLElement {
       return this.granularNode;
     }
     if (!this.loadGranularModulePromise) {
-      this.loadGranularModulePromise = loadGranularModule(this.audioCtx);
+      this.loadGranularModulePromise = loadWorkletModule(this.audioCtx, 'effects/granular-processor.js');
     }
     await this.loadGranularModulePromise;
     this.granularNode = new AudioWorkletNode(this.audioCtx, 'granular-processor', {

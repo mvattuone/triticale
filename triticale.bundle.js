@@ -129,17 +129,24 @@ function makeAbsoluteUrl(path) {
   }
 }
 
-// synth-brain.js
-var loadBitcrusherModule = /* @__PURE__ */ (() => {
-  const loadedOn = /* @__PURE__ */ new WeakSet();
-  return async (context) => {
-    if (!context?.audioWorklet || loadedOn.has(context)) {
-      return;
+// helpers/loadWorkletModule.js
+var loadWorkletModule = /* @__PURE__ */ (() => {
+  const cache = /* @__PURE__ */ new WeakMap();
+  return async (context, relativePath) => {
+    if (!context?.audioWorklet) return;
+    const url = makeAbsoluteUrl(relativePath);
+    let loaded = cache.get(context);
+    if (!loaded) {
+      loaded = /* @__PURE__ */ new Set();
+      cache.set(context, loaded);
     }
-    await context.audioWorklet.addModule(makeAbsoluteUrl("effects/bitcrusher.js"));
-    loadedOn.add(context);
+    if (loaded.has(url)) return;
+    await context.audioWorklet.addModule(url);
+    loaded.add(url);
   };
 })();
+
+// synth-brain.js
 var SynthBrain = class extends HTMLElement {
   constructor() {
     super();
@@ -153,7 +160,7 @@ var SynthBrain = class extends HTMLElement {
     });
     __publicField(this, "bitcrusherFactory", async (payload) => {
       const { context, config } = payload;
-      await loadBitcrusherModule(context);
+      await loadWorkletModule(context, "effects/bitcrusher.js");
       return this.bitcrusher({ context, config });
     });
     this.attachShadow({ mode: "open" });
@@ -387,6 +394,7 @@ var SynthBrain = class extends HTMLElement {
   }
   applyDetuneToActiveSources() {
     if (!this.activeSources || this.activeSources.size === 0) {
+      this.loadGranularModulePromise = loadWorkletModule(this.audioCtx, "effects/granular-processor.js");
       return;
     }
     this.activeSources.forEach(({ source }) => {
