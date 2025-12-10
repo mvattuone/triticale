@@ -4,7 +4,7 @@ import { chunk } from 'helpers/chunk.js';
 import { random } from 'helpers/random.js';
 import { hannWindow } from 'helpers/hannWindow.js';
 import { ensureBoxSizing } from 'helpers/boxSizing.js';
-import { loadWorkletModule } from "./helpers/loadWorkletModule";
+import { loadWorkletModule } from "./helpers/loadWorkletModule.js";
 
 export default class SynthBrain extends HTMLElement {
   constructor() {
