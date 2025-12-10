@@ -75,6 +75,8 @@ export default class SynthBrain extends HTMLElement {
     this.playTimers = [];
     this.processedAudioSelection = null;
     this.processedAudioSelectionPromise = null;
+    this.processedAudioDirty = false;
+    this.processedAudioRenderToken = 0;
     this.notifyGrainCounts();
     this.isLatched = false;
     this.ribbonEngaged = false;
@@ -468,6 +470,8 @@ export default class SynthBrain extends HTMLElement {
       if (typeof this.databender?.updateConfig === 'function') {
         this.databender.updateConfig(effectKey, valueKey, nextValue);
       }
+      this.invalidateProcessedAudio();
+      this.startProcessedAudioRenderIfNeeded();
       const lastSegment = this.lastRequestedImageSegment
         ? { ...this.lastRequestedImageSegment }
         : null;
@@ -479,8 +483,6 @@ export default class SynthBrain extends HTMLElement {
           shouldInvalidateImage = false;
           this.pendingDetuneImageRefresh = true;
         }
-      } else {
-        this.invalidateProcessedAudio();
       }
       if (shouldInvalidateImage) {
         this.invalidateImageRenderState();
@@ -565,10 +567,12 @@ export default class SynthBrain extends HTMLElement {
 
     this.audioSelection = buffer;
     this.audioGrains = this.createGrains(this.audioSelection, 'audio');
-    this.invalidateProcessedAudio();
+    this.invalidateProcessedAudio({ clearReady: true });
+    this.processedAudioDirty = this.areEffectsActive();
     this.syncGrainBufferToWorklet(this.audioSelection).catch((error) => {
       console.error('Failed to sync audio selection to granular engine', error);
     });
+    this.startProcessedAudioRenderIfNeeded();
     this.notifyGrainCounts();
   }
 
@@ -590,7 +594,7 @@ export default class SynthBrain extends HTMLElement {
     this.audioGrains = [];
     this.audioNumberOfGrains = 0;
     this.audioSamplesPerGrain = 0;
-    this.invalidateProcessedAudio();
+    this.invalidateProcessedAudio({ clearReady: true });
     this.lastGranularBuffer = null;
     if (this.granularNode) {
       this.granularNode.port.postMessage({ type: 'clear-buffer' });
@@ -598,10 +602,72 @@ export default class SynthBrain extends HTMLElement {
     this.notifyGrainCounts();
   }
 
-  invalidateProcessedAudio() {
-    this.processedAudioSelection = null;
+  invalidateProcessedAudio({ clearReady = false } = {}) {
+    this.processedAudioDirty = true;
     this.processedAudioSelectionPromise = null;
-    this.lastGranularBuffer = null;
+    this.processedAudioRenderToken += 1;
+    if (clearReady) {
+      this.processedAudioSelection = null;
+      this.lastGranularBuffer = null;
+    }
+  }
+
+  startProcessedAudioRenderIfNeeded() {
+    if (!this.audioSelection) {
+      return;
+    }
+
+    if (!this.areEffectsActive()) {
+      this.processedAudioDirty = false;
+      this.processedAudioSelection = null;
+      return;
+    }
+
+    if (!this.processedAudioDirty && this.processedAudioSelection) {
+      return;
+    }
+
+    if (this.processedAudioSelectionPromise) {
+      return;
+    }
+
+    const renderToken = ++this.processedAudioRenderToken;
+    const startTime = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+      ? performance.now()
+      : Date.now();
+    console.info(`[triticale] processed audio render ${renderToken} started`);
+
+    this.processedAudioSelectionPromise = this.databender
+      .render(this.audioSelection)
+      .then((buffer) => {
+        const endTime = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+          ? performance.now()
+          : Date.now();
+        const durationMs = Math.max(0, endTime - startTime);
+        console.info(`[triticale] processed audio render ${renderToken} finished in ${durationMs.toFixed(1)}ms`);
+        if (renderToken !== this.processedAudioRenderToken) {
+          return null;
+        }
+        this.processedAudioSelection = buffer;
+        this.processedAudioDirty = false;
+        this.syncGrainBufferToWorklet(buffer).catch((error) => {
+          console.error('Failed to sync processed buffer to granular engine', error);
+        });
+        return buffer;
+      })
+      .catch((error) => {
+        console.error('Failed to render processed audio selection', error);
+        if (renderToken === this.processedAudioRenderToken) {
+          this.processedAudioSelection = null;
+          this.processedAudioDirty = true;
+        }
+        throw error;
+      })
+      .finally(() => {
+        if (renderToken === this.processedAudioRenderToken) {
+          this.processedAudioSelectionPromise = null;
+        }
+      });
   }
 
   areEffectsActive() {
@@ -611,7 +677,7 @@ export default class SynthBrain extends HTMLElement {
     return Object.values(this.config.effects).some((effect) => effect?.active);
   }
 
-  async getPlaybackBuffer() {
+  getPlaybackBuffer() {
     if (!this.audioSelection) {
       return null;
     }
@@ -620,31 +686,8 @@ export default class SynthBrain extends HTMLElement {
       return this.audioSelection;
     }
 
-    if (this.processedAudioSelection) {
-      return this.processedAudioSelection;
-    }
-
-    if (!this.processedAudioSelectionPromise) {
-      this.processedAudioSelectionPromise = this.databender
-        .render(this.audioSelection)
-        .then((buffer) => {
-          this.processedAudioSelection = buffer;
-          this.syncGrainBufferToWorklet(buffer).catch((error) => {
-            console.error('Failed to sync processed buffer to granular engine', error);
-          });
-          return buffer;
-        })
-        .catch((error) => {
-          console.error('Failed to render processed audio selection', error);
-          this.processedAudioSelection = null;
-          throw error;
-        })
-        .finally(() => {
-          this.processedAudioSelectionPromise = null;
-        });
-    }
-
-    return this.processedAudioSelectionPromise;
+    this.startProcessedAudioRenderIfNeeded();
+    return this.processedAudioSelection || this.audioSelection;
   }
 
   applyImageBuffer(buffer) {
@@ -838,10 +881,11 @@ export default class SynthBrain extends HTMLElement {
     }
 
     this.audioGrains = this.createGrains(this.audioSelection, 'audio');
-    this.invalidateProcessedAudio();
+    this.invalidateProcessedAudio({ clearReady: true });
     this.syncGrainBufferToWorklet(this.audioSelection).catch((error) => {
       console.error('Failed to sync updated audio selection to granular engine', error);
     });
+    this.startProcessedAudioRenderIfNeeded();
     this.notifyGrainCounts();
   }
 
@@ -1140,7 +1184,7 @@ export default class SynthBrain extends HTMLElement {
     }
 
     try {
-      const playbackBuffer = await this.getPlaybackBuffer();
+      const playbackBuffer = this.getPlaybackBuffer();
       if (!playbackBuffer) {
         return;
       }
