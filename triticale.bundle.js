@@ -130,19 +130,59 @@ function makeAbsoluteUrl(path) {
 }
 
 // helpers/loadWorkletModule.js
+var BASE_FROM_IMPORT = (() => {
+  try {
+    return new URL("./", import.meta.url).href;
+  } catch (error) {
+    return null;
+  }
+})();
+function buildCandidateUrls(relativePath) {
+  const urls = [];
+  const seen = /* @__PURE__ */ new Set();
+  const add = (value) => {
+    if (!value) return;
+    try {
+      const url = new URL(value).href;
+      if (!seen.has(url)) {
+        seen.add(url);
+        urls.push(url);
+      }
+    } catch (error) {
+    }
+  };
+  add(makeAbsoluteUrl(relativePath));
+  if (BASE_FROM_IMPORT) {
+    add(new URL(relativePath, BASE_FROM_IMPORT).href);
+  }
+  if (typeof window !== "undefined" && window.location) {
+    add(new URL(relativePath, window.location.origin + "/").href);
+  }
+  return urls;
+}
 var loadWorkletModule = /* @__PURE__ */ (() => {
   const cache = /* @__PURE__ */ new WeakMap();
   return async (context, relativePath) => {
     if (!context?.audioWorklet) return;
-    const url = makeAbsoluteUrl(relativePath);
+    const candidates = buildCandidateUrls(relativePath);
     let loaded = cache.get(context);
     if (!loaded) {
       loaded = /* @__PURE__ */ new Set();
       cache.set(context, loaded);
     }
-    if (loaded.has(url)) return;
-    await context.audioWorklet.addModule(url);
-    loaded.add(url);
+    for (const url of candidates) {
+      if (loaded.has(url)) {
+        return;
+      }
+      try {
+        await context.audioWorklet.addModule(url);
+        loaded.add(url);
+        return;
+      } catch (error) {
+        console.warn(`[triticale] Failed to load worklet module from ${url}:`, error?.message || error);
+      }
+    }
+    throw new Error(`Failed to load worklet module "${relativePath}" after trying: ${candidates.join(", ")}`);
   };
 })();
 
@@ -229,6 +269,8 @@ var SynthBrain = class extends HTMLElement {
     this.playTimers = [];
     this.processedAudioSelection = null;
     this.processedAudioSelectionPromise = null;
+    this.processedAudioDirty = false;
+    this.processedAudioRenderToken = 0;
     this.notifyGrainCounts();
     this.isLatched = false;
     this.ribbonEngaged = false;
@@ -546,6 +588,8 @@ var SynthBrain = class extends HTMLElement {
       if (typeof this.databender?.updateConfig === "function") {
         this.databender.updateConfig(effectKey, valueKey, nextValue);
       }
+      this.invalidateProcessedAudio();
+      this.startProcessedAudioRenderIfNeeded();
       const lastSegment = this.lastRequestedImageSegment ? { ...this.lastRequestedImageSegment } : null;
       let shouldInvalidateImage = true;
       if (effectKey === "detune") {
@@ -555,8 +599,6 @@ var SynthBrain = class extends HTMLElement {
           shouldInvalidateImage = false;
           this.pendingDetuneImageRefresh = true;
         }
-      } else {
-        this.invalidateProcessedAudio();
       }
       if (shouldInvalidateImage) {
         this.invalidateImageRenderState();
@@ -626,10 +668,12 @@ var SynthBrain = class extends HTMLElement {
     }
     this.audioSelection = buffer;
     this.audioGrains = this.createGrains(this.audioSelection, "audio");
-    this.invalidateProcessedAudio();
+    this.invalidateProcessedAudio({ clearReady: true });
+    this.processedAudioDirty = this.areEffectsActive();
     this.syncGrainBufferToWorklet(this.audioSelection).catch((error) => {
       console.error("Failed to sync audio selection to granular engine", error);
     });
+    this.startProcessedAudioRenderIfNeeded();
     this.notifyGrainCounts();
   }
   handleAudioUploaded(event) {
@@ -648,17 +692,65 @@ var SynthBrain = class extends HTMLElement {
     this.audioGrains = [];
     this.audioNumberOfGrains = 0;
     this.audioSamplesPerGrain = 0;
-    this.invalidateProcessedAudio();
+    this.invalidateProcessedAudio({ clearReady: true });
     this.lastGranularBuffer = null;
     if (this.granularNode) {
       this.granularNode.port.postMessage({ type: "clear-buffer" });
     }
     this.notifyGrainCounts();
   }
-  invalidateProcessedAudio() {
-    this.processedAudioSelection = null;
+  invalidateProcessedAudio({ clearReady = false } = {}) {
+    this.processedAudioDirty = true;
     this.processedAudioSelectionPromise = null;
-    this.lastGranularBuffer = null;
+    this.processedAudioRenderToken += 1;
+    if (clearReady) {
+      this.processedAudioSelection = null;
+      this.lastGranularBuffer = null;
+    }
+  }
+  startProcessedAudioRenderIfNeeded() {
+    if (!this.audioSelection) {
+      return;
+    }
+    if (!this.areEffectsActive()) {
+      this.processedAudioDirty = false;
+      this.processedAudioSelection = null;
+      return;
+    }
+    if (!this.processedAudioDirty && this.processedAudioSelection) {
+      return;
+    }
+    if (this.processedAudioSelectionPromise) {
+      return;
+    }
+    const renderToken = ++this.processedAudioRenderToken;
+    const startTime = typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+    console.info(`[triticale] processed audio render ${renderToken} started`);
+    this.processedAudioSelectionPromise = this.databender.render(this.audioSelection).then((buffer) => {
+      const endTime = typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+      const durationMs = Math.max(0, endTime - startTime);
+      console.info(`[triticale] processed audio render ${renderToken} finished in ${durationMs.toFixed(1)}ms`);
+      if (renderToken !== this.processedAudioRenderToken) {
+        return null;
+      }
+      this.processedAudioSelection = buffer;
+      this.processedAudioDirty = false;
+      this.syncGrainBufferToWorklet(buffer).catch((error) => {
+        console.error("Failed to sync processed buffer to granular engine", error);
+      });
+      return buffer;
+    }).catch((error) => {
+      console.error("Failed to render processed audio selection", error);
+      if (renderToken === this.processedAudioRenderToken) {
+        this.processedAudioSelection = null;
+        this.processedAudioDirty = true;
+      }
+      throw error;
+    }).finally(() => {
+      if (renderToken === this.processedAudioRenderToken) {
+        this.processedAudioSelectionPromise = null;
+      }
+    });
   }
   areEffectsActive() {
     if (!this.config?.effects) {
@@ -666,32 +758,15 @@ var SynthBrain = class extends HTMLElement {
     }
     return Object.values(this.config.effects).some((effect) => effect?.active);
   }
-  async getPlaybackBuffer() {
+  getPlaybackBuffer() {
     if (!this.audioSelection) {
       return null;
     }
     if (!this.areEffectsActive()) {
       return this.audioSelection;
     }
-    if (this.processedAudioSelection) {
-      return this.processedAudioSelection;
-    }
-    if (!this.processedAudioSelectionPromise) {
-      this.processedAudioSelectionPromise = this.databender.render(this.audioSelection).then((buffer) => {
-        this.processedAudioSelection = buffer;
-        this.syncGrainBufferToWorklet(buffer).catch((error) => {
-          console.error("Failed to sync processed buffer to granular engine", error);
-        });
-        return buffer;
-      }).catch((error) => {
-        console.error("Failed to render processed audio selection", error);
-        this.processedAudioSelection = null;
-        throw error;
-      }).finally(() => {
-        this.processedAudioSelectionPromise = null;
-      });
-    }
-    return this.processedAudioSelectionPromise;
+    this.startProcessedAudioRenderIfNeeded();
+    return this.processedAudioSelection || this.audioSelection;
   }
   applyImageBuffer(buffer) {
     if (!buffer) {
@@ -857,10 +932,11 @@ var SynthBrain = class extends HTMLElement {
       }
     }
     this.audioGrains = this.createGrains(this.audioSelection, "audio");
-    this.invalidateProcessedAudio();
+    this.invalidateProcessedAudio({ clearReady: true });
     this.syncGrainBufferToWorklet(this.audioSelection).catch((error) => {
       console.error("Failed to sync updated audio selection to granular engine", error);
     });
+    this.startProcessedAudioRenderIfNeeded();
     this.notifyGrainCounts();
   }
   createWindowCurve(length) {
@@ -1121,7 +1197,7 @@ var SynthBrain = class extends HTMLElement {
       return;
     }
     try {
-      const playbackBuffer = await this.getPlaybackBuffer();
+      const playbackBuffer = this.getPlaybackBuffer();
       if (!playbackBuffer) {
         return;
       }
