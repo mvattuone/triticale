@@ -5,6 +5,7 @@ import { random } from 'helpers/random.js';
 import { hannWindow } from 'helpers/hannWindow.js';
 import { ensureBoxSizing } from 'helpers/boxSizing.js';
 import { loadWorkletModule } from "./helpers/loadWorkletModule.js";
+import { LRUCache } from 'helpers/lruCache.js';
 
 export default class SynthBrain extends HTMLElement {
   constructor() {
@@ -46,6 +47,13 @@ export default class SynthBrain extends HTMLElement {
           randomValues: 0,
           type: "lowpass",
         },
+      },
+      glitch: {
+        active: false,
+        overlays: 3,
+        alpha: 0.14,
+        history: 12,
+        rate: 5,
       },
       grainIndex: 1,
       grainDuration: 200,
@@ -90,6 +98,9 @@ export default class SynthBrain extends HTMLElement {
     this.faviconUpdateInterval = 250;
     this.imageRenderCacheVersion = 0;
     this.imageRenderCache = new Map();
+    this.ghostFrameId = 0;
+    this.captureGhostNextRender = false;
+    this.ghostFrameCache = new LRUCache(Math.max(1, this.config.glitch.history || 12));
     this.setAttribute('data-playing', 'false');
     this.granularNode = null;
     this.loadGranularModulePromise = null;
@@ -103,6 +114,7 @@ export default class SynthBrain extends HTMLElement {
     this.addEventListener("latch-changed", this.handleLatchChanged);
     this.addEventListener("update-config", this.handleUpdateConfig);
     this.addEventListener("audio-cleared", this.handleAudioCleared);
+    this.updateGlitchControlState();
   }
 
   disconnectedCallback() {
@@ -501,6 +513,25 @@ export default class SynthBrain extends HTMLElement {
       }
     }
 
+    if (name.startsWith('glitch.')) {
+      if (name === 'glitch.history') {
+        const limit = Math.max(1, Math.round(Number(nextValue) || 12));
+        this.ghostFrameCache = new LRUCache(limit);
+      }
+      if (name === 'glitch.active' && nextValue === false) {
+        this.captureGhostNextRender = false;
+        const segmentToRender = this.lastRequestedImageSegment
+          ? { ...this.lastRequestedImageSegment }
+          : null;
+        if (segmentToRender) {
+          this.renderImageSegment(segmentToRender.segmentIndex, segmentToRender.segmentCount);
+        } else if (this.imageGrains.length > 0) {
+          this.renderStandaloneImage();
+        }
+      }
+      this.updateGlitchControlState();
+    }
+
     if (name === 'grainIndex' && this.isPlaying) {
       if (this.audioGrains.length > 0) {
         this.audioGrainCallback();
@@ -732,6 +763,7 @@ export default class SynthBrain extends HTMLElement {
     this.imageRenderInFlight = false;
     this.lastRequestedImageSegment = null;
     this.imageRenderToken = 0;
+    this.captureGhostNextRender = false;
   }
 
   invalidateImageRenderState() {
@@ -979,6 +1011,10 @@ export default class SynthBrain extends HTMLElement {
     };
     this.pendingImageRender = { ...nextRequest };
     this.lastRequestedImageSegment = { ...nextRequest };
+    if (this.imageRenderInFlight) {
+      this.captureGhostNextRender = true;
+      return;
+    }
     if (!this.imageRenderInFlight) {
       this.processNextImageRender();
     }
@@ -1046,6 +1082,7 @@ export default class SynthBrain extends HTMLElement {
       return;
     }
 
+    const wasInFlight = Boolean(this.currentImageRender);
     const requestId = ++this.imageRenderToken;
     this.currentImageRender = {
       requestId,
@@ -1053,6 +1090,12 @@ export default class SynthBrain extends HTMLElement {
       segmentCount,
       cacheKey,
     };
+    if (wasInFlight) {
+      this.captureGhostNextRender = true;
+    }
+    if (this.pendingImageRender) {
+      this.captureGhostNextRender = true;
+    }
 
     Promise.resolve(this.databender.render(grainBuffer))
       .then((buffer) => {
@@ -1120,8 +1163,106 @@ export default class SynthBrain extends HTMLElement {
       targetHeight,
     );
 
+    if (this.config?.glitch?.active) {
+      this.drawGhostFrames(context, targetWidth, targetHeight);
+    }
+    if (this.captureGhostNextRender) {
+      this.captureGhostFrame(canvas);
+      this.captureGhostNextRender = false;
+    }
+
     this.updateFaviconFromCanvas(canvas);
     this.dispatchRibbonImageDraw(segmentIndex, segmentCount);
+  }
+
+  drawGhostFrames(context, targetWidth, targetHeight) {
+    const glitchConfig = this.config?.glitch;
+    if (!glitchConfig?.active) return;
+    const frames = Array.from(this.ghostFrameCache?.cache?.values?.() || []);
+    if (!frames.length) return;
+    const overlays = Math.max(1, Math.min(Math.round(glitchConfig.overlays || 3), frames.length));
+    const rate = Math.max(0, Math.min(10, Number(glitchConfig.rate) || 0));
+    if (rate <= 0) return;
+    const frequency = rate / 10; // 0..1 probability per draw
+    if (Math.random() > frequency) return;
+    const alpha = Math.max(0, Math.min(1, Number(glitchConfig.alpha) || 0.14));
+    context.save();
+    context.globalCompositeOperation = 'lighter';
+    context.globalAlpha = alpha;
+    for (let i = 0; i < overlays; i += 1) {
+      const idx = Math.floor(Math.random() * frames.length);
+      const frame = frames[idx];
+      if (!frame) continue;
+      try {
+        context.drawImage(frame, 0, 0, targetWidth, targetHeight);
+      } catch (error) {
+        // ignore draw errors
+      }
+    }
+    context.restore();
+  }
+
+  captureGhostFrame(canvas) {
+    if (!canvas || typeof createImageBitmap !== 'function') {
+      return;
+    }
+    const glitchConfig = this.config?.glitch;
+    const limit = Math.max(1, Math.round(glitchConfig?.history || 12));
+    if (!this.ghostFrameCache || this.ghostFrameCache.size !== limit) {
+      this.ghostFrameCache = new LRUCache(limit);
+    }
+    createImageBitmap(canvas).then((bitmap) => {
+      if (this.ghostFrameCache.cache.size >= limit) {
+        const lruKey = this.ghostFrameCache.cache.keys().next().value;
+        const lruVal = this.ghostFrameCache.cache.get(lruKey);
+        if (lruVal && typeof lruVal.close === 'function') {
+          lruVal.close();
+        }
+      }
+      const key = `frame-${++this.ghostFrameId}`;
+      this.ghostFrameCache.write(key, bitmap);
+      while (this.ghostFrameCache.cache.size > limit) {
+        // LRU eviction already performed in write
+        break;
+      }
+      this.updateGlitchControlState();
+    }).catch(() => {
+      // ignore capture failures
+    });
+  }
+
+  clearGhostFrames() {
+    if (this.ghostFrameCache && this.ghostFrameCache.cache) {
+      this.ghostFrameCache.cache.forEach((frame) => {
+        if (frame && typeof frame.close === 'function') {
+          frame.close();
+        }
+      });
+      this.ghostFrameCache.clear();
+    }
+    this.ghostFrameId = 0;
+    this.updateGlitchControlState();
+  }
+
+  getGhostFrameCount() {
+    return this.ghostFrameCache?.cache?.size || 0;
+  }
+
+  updateGlitchControlState() {
+    const glitchSwitch = document.querySelector('synth-switch[name="glitch.active"]');
+    const glitchRateDial = document.querySelector('synth-dial[name="glitch.rate"]');
+    const ghostIndicator = document.querySelector('.ghost-indicator');
+    const hasFrames = this.getGhostFrameCount() >= 2;
+    if (glitchSwitch && 'disabled' in glitchSwitch) {
+      glitchSwitch.disabled = !hasFrames;
+    }
+    if (glitchRateDial && 'disabled' in glitchRateDial) {
+      glitchRateDial.disabled = !hasFrames;
+    }
+    if (ghostIndicator) {
+      ghostIndicator.textContent = `Ghosts: ${this.getGhostFrameCount()}`;
+      ghostIndicator.classList.toggle('has-ghosts', this.getGhostFrameCount() > 0);
+    }
   }
 
   updateFaviconFromCanvas(canvas) {

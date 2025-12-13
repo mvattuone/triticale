@@ -33,6 +33,12 @@
         </synth-section>
         <section id="transport">
           <latch-button></latch-button>
+          <div class="glitch-controls">
+            <synth-switch name="glitch.active" label="Glitch"></synth-switch>
+            <synth-dial name="glitch.rate" min="0" max="10" step="1" label="Glitch rate"></synth-dial>
+            <synth-dial name="glitch.overlays" min="1" max="8" step="1" label="Ghosts"></synth-dial>
+            <div class="ghost-indicator" aria-live="polite">Ghosts: 0</div>
+          </div>
         </section>
         <synth-display></synth-display>
         <synth-waveform></synth-waveform>
