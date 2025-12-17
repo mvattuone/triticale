@@ -186,6 +186,46 @@ var loadWorkletModule = /* @__PURE__ */ (() => {
   };
 })();
 
+// helpers/lruCache.js
+var LRUCache = class {
+  constructor(size) {
+    this.size = size;
+    this.cache = /* @__PURE__ */ new Map();
+  }
+  write(key, value) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+      this.cache.set(key, value);
+    } else if (this.cache.size >= this.size) {
+      const lru = this.cache.keys().next().value;
+      this.cache.delete(lru);
+      this.cache.set(key, value);
+    } else {
+      this.cache.set(key, value);
+    }
+  }
+  read(key) {
+    let value;
+    if (this.cache.has(key)) {
+      value = this.cache.get(key);
+      this.cache.delete(key);
+      this.cache.set(key, value);
+    }
+    return value;
+  }
+  delete(key) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+  }
+  clear() {
+    this.cache.clear();
+  }
+  dump() {
+    return [...this.cache.entries()].map(([key, value]) => `${key}: ${value}`).join("\n");
+  }
+};
+
 // synth-brain.js
 var SynthBrain = class extends HTMLElement {
   constructor() {
@@ -241,6 +281,13 @@ var SynthBrain = class extends HTMLElement {
           type: "lowpass"
         }
       },
+      glitch: {
+        active: false,
+        overlays: 3,
+        alpha: 0.14,
+        history: 12,
+        rate: 5
+      },
       grainIndex: 1,
       grainDuration: 200,
       density: 1,
@@ -284,6 +331,9 @@ var SynthBrain = class extends HTMLElement {
     this.faviconUpdateInterval = 250;
     this.imageRenderCacheVersion = 0;
     this.imageRenderCache = /* @__PURE__ */ new Map();
+    this.ghostFrameId = 0;
+    this.captureGhostNextRender = false;
+    this.ghostFrameCache = new LRUCache(Math.max(1, this.config.glitch.history || 12));
     this.setAttribute("data-playing", "false");
     this.granularNode = null;
     this.loadGranularModulePromise = null;
@@ -296,6 +346,7 @@ var SynthBrain = class extends HTMLElement {
     this.addEventListener("latch-changed", this.handleLatchChanged);
     this.addEventListener("update-config", this.handleUpdateConfig);
     this.addEventListener("audio-cleared", this.handleAudioCleared);
+    this.updateGlitchControlState();
   }
   disconnectedCallback() {
     this.removeEventListener("image-uploaded", this.handleImageUploaded);
@@ -588,8 +639,11 @@ var SynthBrain = class extends HTMLElement {
       if (typeof this.databender?.updateConfig === "function") {
         this.databender.updateConfig(effectKey, valueKey, nextValue);
       }
-      this.invalidateProcessedAudio();
-      this.startProcessedAudioRenderIfNeeded();
+      const shouldReprocessAudio = effectKey !== "detune";
+      if (shouldReprocessAudio) {
+        this.invalidateProcessedAudio({ cancelRender: true });
+        this.startProcessedAudioRenderIfNeeded();
+      }
       const lastSegment = this.lastRequestedImageSegment ? { ...this.lastRequestedImageSegment } : null;
       let shouldInvalidateImage = true;
       if (effectKey === "detune") {
@@ -610,6 +664,22 @@ var SynthBrain = class extends HTMLElement {
         }
         this.pendingDetuneImageRefresh = false;
       }
+    }
+    if (name.startsWith("glitch.")) {
+      if (name === "glitch.history") {
+        const limit = Math.max(1, Math.round(Number(nextValue) || 12));
+        this.ghostFrameCache = new LRUCache(limit);
+      }
+      if (name === "glitch.active" && nextValue === false) {
+        this.captureGhostNextRender = false;
+        const segmentToRender = this.lastRequestedImageSegment ? { ...this.lastRequestedImageSegment } : null;
+        if (segmentToRender) {
+          this.renderImageSegment(segmentToRender.segmentIndex, segmentToRender.segmentCount);
+        } else if (this.imageGrains.length > 0) {
+          this.renderStandaloneImage();
+        }
+      }
+      this.updateGlitchControlState();
     }
     if (name === "grainIndex" && this.isPlaying) {
       if (this.audioGrains.length > 0) {
@@ -668,7 +738,7 @@ var SynthBrain = class extends HTMLElement {
     }
     this.audioSelection = buffer;
     this.audioGrains = this.createGrains(this.audioSelection, "audio");
-    this.invalidateProcessedAudio({ clearReady: true });
+    this.invalidateProcessedAudio({ clearReady: true, cancelRender: true });
     this.processedAudioDirty = this.areEffectsActive();
     this.syncGrainBufferToWorklet(this.audioSelection).catch((error) => {
       console.error("Failed to sync audio selection to granular engine", error);
@@ -692,17 +762,18 @@ var SynthBrain = class extends HTMLElement {
     this.audioGrains = [];
     this.audioNumberOfGrains = 0;
     this.audioSamplesPerGrain = 0;
-    this.invalidateProcessedAudio({ clearReady: true });
+    this.invalidateProcessedAudio({ clearReady: true, cancelRender: true });
     this.lastGranularBuffer = null;
     if (this.granularNode) {
       this.granularNode.port.postMessage({ type: "clear-buffer" });
     }
     this.notifyGrainCounts();
   }
-  invalidateProcessedAudio({ clearReady = false } = {}) {
+  invalidateProcessedAudio({ clearReady = false, cancelRender = false } = {}) {
     this.processedAudioDirty = true;
-    this.processedAudioSelectionPromise = null;
-    this.processedAudioRenderToken += 1;
+    if (cancelRender) {
+      this.processedAudioRenderToken += 1;
+    }
     if (clearReady) {
       this.processedAudioSelection = null;
       this.lastGranularBuffer = null;
@@ -725,14 +796,14 @@ var SynthBrain = class extends HTMLElement {
     }
     const renderToken = ++this.processedAudioRenderToken;
     const startTime = typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
-    console.info(`[triticale] processed audio render ${renderToken} started`);
     this.processedAudioSelectionPromise = this.databender.render(this.audioSelection).then((buffer) => {
       const endTime = typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
       const durationMs = Math.max(0, endTime - startTime);
-      console.info(`[triticale] processed audio render ${renderToken} finished in ${durationMs.toFixed(1)}ms`);
       if (renderToken !== this.processedAudioRenderToken) {
+        this.processedAudioDirty = true;
         return null;
       }
+      console.info(`[triticale] processed audio render ${renderToken} finished in ${durationMs.toFixed(1)}ms`);
       this.processedAudioSelection = buffer;
       this.processedAudioDirty = false;
       this.syncGrainBufferToWorklet(buffer).catch((error) => {
@@ -747,8 +818,9 @@ var SynthBrain = class extends HTMLElement {
       }
       throw error;
     }).finally(() => {
-      if (renderToken === this.processedAudioRenderToken) {
-        this.processedAudioSelectionPromise = null;
+      this.processedAudioSelectionPromise = null;
+      if (this.processedAudioDirty) {
+        this.startProcessedAudioRenderIfNeeded();
       }
     });
   }
@@ -800,6 +872,7 @@ var SynthBrain = class extends HTMLElement {
     this.imageRenderInFlight = false;
     this.lastRequestedImageSegment = null;
     this.imageRenderToken = 0;
+    this.captureGhostNextRender = false;
   }
   invalidateImageRenderState() {
     this.resetImageRenderQueue();
@@ -1014,6 +1087,10 @@ var SynthBrain = class extends HTMLElement {
     };
     this.pendingImageRender = { ...nextRequest };
     this.lastRequestedImageSegment = { ...nextRequest };
+    if (this.imageRenderInFlight) {
+      this.captureGhostNextRender = true;
+      return;
+    }
     if (!this.imageRenderInFlight) {
       this.processNextImageRender();
     }
@@ -1072,6 +1149,7 @@ var SynthBrain = class extends HTMLElement {
       }
       return;
     }
+    const wasInFlight = Boolean(this.currentImageRender);
     const requestId = ++this.imageRenderToken;
     this.currentImageRender = {
       requestId,
@@ -1079,6 +1157,12 @@ var SynthBrain = class extends HTMLElement {
       segmentCount,
       cacheKey
     };
+    if (wasInFlight) {
+      this.captureGhostNextRender = true;
+    }
+    if (this.pendingImageRender) {
+      this.captureGhostNextRender = true;
+    }
     Promise.resolve(this.databender.render(grainBuffer)).then((buffer) => {
       if (!this.currentImageRender || this.currentImageRender.requestId !== requestId) {
         return;
@@ -1137,8 +1221,97 @@ var SynthBrain = class extends HTMLElement {
       targetWidth,
       targetHeight
     );
+    if (this.config?.glitch?.active) {
+      this.drawGhostFrames(context, targetWidth, targetHeight);
+    }
+    if (this.captureGhostNextRender) {
+      this.captureGhostFrame(canvas);
+      this.captureGhostNextRender = false;
+    }
     this.updateFaviconFromCanvas(canvas);
     this.dispatchRibbonImageDraw(segmentIndex, segmentCount);
+  }
+  drawGhostFrames(context, targetWidth, targetHeight) {
+    const glitchConfig = this.config?.glitch;
+    if (!glitchConfig?.active) return;
+    const frames = Array.from(this.ghostFrameCache?.cache?.values?.() || []);
+    if (!frames.length) return;
+    const overlays = Math.max(1, Math.min(Math.round(glitchConfig.overlays || 3), frames.length));
+    const rate = Math.max(0, Math.min(10, Number(glitchConfig.rate) || 0));
+    if (rate <= 0) return;
+    const frequency = rate / 10;
+    if (Math.random() > frequency) return;
+    const alpha = Math.max(0, Math.min(1, Number(glitchConfig.alpha) || 0.14));
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.globalAlpha = alpha;
+    for (let i = 0; i < overlays; i += 1) {
+      const idx = Math.floor(Math.random() * frames.length);
+      const frame = frames[idx];
+      if (!frame) continue;
+      try {
+        context.drawImage(frame, 0, 0, targetWidth, targetHeight);
+      } catch (error) {
+      }
+    }
+    context.restore();
+  }
+  captureGhostFrame(canvas) {
+    if (!canvas || typeof createImageBitmap !== "function") {
+      return;
+    }
+    const glitchConfig = this.config?.glitch;
+    const limit = Math.max(1, Math.round(glitchConfig?.history || 12));
+    if (!this.ghostFrameCache || this.ghostFrameCache.size !== limit) {
+      this.ghostFrameCache = new LRUCache(limit);
+    }
+    createImageBitmap(canvas).then((bitmap) => {
+      if (this.ghostFrameCache.cache.size >= limit) {
+        const lruKey = this.ghostFrameCache.cache.keys().next().value;
+        const lruVal = this.ghostFrameCache.cache.get(lruKey);
+        if (lruVal && typeof lruVal.close === "function") {
+          lruVal.close();
+        }
+      }
+      const key = `frame-${++this.ghostFrameId}`;
+      this.ghostFrameCache.write(key, bitmap);
+      while (this.ghostFrameCache.cache.size > limit) {
+        break;
+      }
+      this.updateGlitchControlState();
+    }).catch(() => {
+    });
+  }
+  clearGhostFrames() {
+    if (this.ghostFrameCache && this.ghostFrameCache.cache) {
+      this.ghostFrameCache.cache.forEach((frame) => {
+        if (frame && typeof frame.close === "function") {
+          frame.close();
+        }
+      });
+      this.ghostFrameCache.clear();
+    }
+    this.ghostFrameId = 0;
+    this.updateGlitchControlState();
+  }
+  getGhostFrameCount() {
+    return this.ghostFrameCache?.cache?.size || 0;
+  }
+  updateGlitchControlState() {
+    const glitchSwitch = document.querySelector('synth-switch[name="glitch.active"]');
+    const glitchRateDial = document.querySelector('synth-dial[name="glitch.rate"]');
+    const ghostIndicator = document.querySelector(".ghost-indicator");
+    const hasFrames = this.getGhostFrameCount() >= 2;
+    if (glitchSwitch && "disabled" in glitchSwitch) {
+      glitchSwitch.disabled = !hasFrames;
+    }
+    if (glitchRateDial && "disabled" in glitchRateDial) {
+      glitchRateDial.disabled = !hasFrames;
+    }
+    if (ghostIndicator) {
+      ghostIndicator.textContent = `Ghosts: ${this.getGhostFrameCount()}`;
+      ghostIndicator.classList.toggle("has-ghosts", this.getGhostFrameCount() > 0);
+    }
   }
   updateFaviconFromCanvas(canvas) {
     if (!canvas) {
@@ -5244,6 +5417,12 @@ var index_default = `<!doctype html>
         </synth-section>
         <section id="transport">
           <latch-button></latch-button>
+          <div class="glitch-controls">
+            <synth-switch name="glitch.active" label="Glitch"></synth-switch>
+            <synth-dial name="glitch.rate" min="0" max="10" step="1" label="Glitch rate"></synth-dial>
+            <synth-dial name="glitch.overlays" min="1" max="8" step="1" label="Ghosts"></synth-dial>
+            <div class="ghost-indicator" aria-live="polite">Ghosts: 0</div>
+          </div>
         </section>
         <synth-display></synth-display>
         <synth-waveform></synth-waveform>
@@ -5398,7 +5577,6 @@ async function unmount(rootEl, hostContext = null) {
   if (!(rootEl instanceof HTMLElement)) {
     throw new Error("unmount() requires a root HTMLElement");
   }
-  persistSynthState(rootEl, hostContext);
   try {
     rootEl.dispatchEvent(
       new Event("stop-synth", { bubbles: true, composed: true })
@@ -5432,7 +5610,6 @@ async function mount({ container, root, host } = {}) {
   rewriteAssetReferences(fragment);
   container.style.backgroundColor = getComputedStyle(rootEl).backgroundColor;
   container.replaceChildren(fragment);
-  restoreSynthState(rootEl, host);
   return {
     container,
     rootEl

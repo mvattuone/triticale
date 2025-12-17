@@ -106,8 +106,6 @@ export async function unmount(rootEl, hostContext = null) {
     throw new Error("unmount() requires a root HTMLElement");
   }
 
-  persistSynthState(rootEl, hostContext);
-
   try {
     rootEl.dispatchEvent(
       new Event("stop-synth", { bubbles: true, composed: true })
@@ -151,8 +149,6 @@ export async function mount({ container, root, host } = {}) {
 
   container.style.backgroundColor = getComputedStyle(rootEl).backgroundColor;
   container.replaceChildren(fragment);
-
-  restoreSynthState(rootEl, host);
 
   return {
     container,
