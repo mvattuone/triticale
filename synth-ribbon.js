@@ -224,7 +224,7 @@ export default class SynthRibbon extends HTMLElement {
     if (event.pointerId !== this.pointerId) {
       return;
     }
-    this.updateFromEvent(event, { final: true });
+    this.finishInteraction();
   }
 
   handlePointerLeave(event) {
@@ -234,7 +234,7 @@ export default class SynthRibbon extends HTMLElement {
     this.finishInteraction({ cancel: true });
   }
 
-  updateFromEvent(event, options = {}) {
+  updateFromEvent(event) {
     if (!this.hasGrains) {
       return;
     }
@@ -255,10 +255,6 @@ export default class SynthRibbon extends HTMLElement {
     );
 
     this.setIndex(index);
-
-    if (options.final) {
-      this.finishInteraction();
-    }
   }
 
   finishInteraction({ cancel = false } = {}) {
@@ -283,9 +279,9 @@ export default class SynthRibbon extends HTMLElement {
       return;
     }
     const segments = Math.max(1, this.segments);
-    const clamped = Math.max(1, Math.min(index, segments));
+    const clamped = Math.max(0, Math.min(index, segments));
     this.currentIndex = clamped;
-    this.updateIndicator(this.currentIndex - 1);
+    this.updateIndicator(this.currentIndex);
     this.updateValueDisplay();
     this.sendConfigUpdate(clamped);
   }
@@ -323,7 +319,7 @@ export default class SynthRibbon extends HTMLElement {
     const clampedIndex = Math.max(0, Math.min(index, this.segments - 1));
     this.indicator.style.display = '';
     this.ribbon.style.setProperty('--indicator-index', clampedIndex);
-    this.ribbon.setAttribute('aria-valuenow', String(clampedIndex + 1));
+    this.ribbon.setAttribute('aria-valuenow', String(clampedIndex));
   }
 
   updateValueDisplay() {
@@ -331,7 +327,7 @@ export default class SynthRibbon extends HTMLElement {
       this.valueDisplay.textContent = '--';
       return;
     }
-    this.valueDisplay.textContent = `${this.currentIndex} / ${this.segments}`;
+    this.valueDisplay.textContent = `${this.currentIndex + 1} / ${this.segments}`;
   }
 
   sendConfigUpdate(index) {
@@ -400,8 +396,8 @@ export default class SynthRibbon extends HTMLElement {
 
   applyExternalIndex(clampedIndex) {
     this.pendingExternalIndex = null;
-    this.updateIndicator(clampedIndex);
-    this.currentIndex = clampedIndex + 1;
+    this.updateIndicator(this.currentIndex);
+    this.currentIndex = clampedIndex;
     this.updateValueDisplay();
   }
 
